@@ -1,24 +1,32 @@
-import { Image, StyleSheet, View } from 'react-native';
-
+import { Ionicons } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Logo from '@/assets/images/icon.png';
 
 export default function TopBar() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.topbar}>
+    <View style={[styles.topbar, { paddingTop: insets.top }]}>
       <Image source={Logo} style={styles.logo} />
+      <Pressable onPress={() => console.log('menu')}>
+        <Ionicons name="menu" size={28} color="#1f2937" />
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   topbar: {
-    height: 72,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
   logo: {
-    width: 104,
-    height: 40,
+    width: 110,
+    height: 36,
     resizeMode: 'contain',
   },
 });
