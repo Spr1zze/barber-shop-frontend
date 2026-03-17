@@ -3,33 +3,11 @@ import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type NavItem = {
-  label: string;
-  href: '/' | '/bookings' | '/profile';
-  activeIcon: keyof typeof Ionicons.glyphMap;
-  inactiveIcon: keyof typeof Ionicons.glyphMap;
-};
-
-const navItems: NavItem[] = [
-  {
-    label: 'Saloner',
-    href: '/',
-    activeIcon: 'home',
-    inactiveIcon: 'home-outline',
-  },
-  {
-    label: 'Mine bookinger',
-    href: '/bookings',
-    activeIcon: 'calendar',
-    inactiveIcon: 'calendar-outline',
-  },
-  {
-    label: 'Profil',
-    href: '/profile',
-    activeIcon: 'person',
-    inactiveIcon: 'person-outline',
-  },
-];
+const NAV_ITEMS = [
+  { label: 'Saloner', href: '/', icon: 'home', iconOutline: 'home-outline' },
+  { label: 'Mine bookinger', href: '/bookings', icon: 'calendar', iconOutline: 'calendar-outline' },
+  { label: 'Profil', href: '/profile', icon: 'person', iconOutline: 'person-outline' },
+] as const;
 
 export default function BottomNavBar() {
   const insets = useSafeAreaInsets();
@@ -37,60 +15,49 @@ export default function BottomNavBar() {
   const router = useRouter();
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-      <View style={styles.navbar}>
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const color = isActive ? '#2596be' : '#9ca3af';
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      {NAV_ITEMS.map((item) => {
+        const isActive = pathname === item.href;
+        const color = isActive ? '#2596be' : '#9ca3af';
 
-          return (
-            <Pressable
-              key={item.href}
-              onPress={() => {
-                if (!isActive) {
-                  router.replace(item.href);
-                }
-              }}
-              style={styles.navItem}>
-              <Ionicons
-                name={isActive ? item.activeIcon : item.inactiveIcon}
-                size={22}
-                color={color}
-              />
-              <Text style={[styles.label, { color }]} numberOfLines={1}>
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+        return (
+          <Pressable
+            key={item.href}
+            onPress={() => !isActive && router.replace(item.href)}
+            style={styles.item}
+          >
+            <Ionicons
+              name={isActive ? item.icon : item.iconOutline}
+              size={22}
+              color={color}
+            />
+            <Text style={[styles.label, { color }]} numberOfLines={1}>
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  navbar: {
+  container: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    borderRadius: 28,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 14,
   },
-  navItem: {
+  item: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 4,
     paddingVertical: 4,
   },
