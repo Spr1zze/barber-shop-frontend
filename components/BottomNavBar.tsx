@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const NAV_ITEMS = [
-  { label: 'Saloner', href: '/', icon: 'home', iconOutline: 'home-outline' },
+  { label: 'Saloner', href: '/book', icon: 'home', iconOutline: 'home-outline' },
   { label: 'Mine bookinger', href: '/bookings', icon: 'calendar', iconOutline: 'calendar-outline' },
   { label: 'Profil', href: '/profile', icon: 'person', iconOutline: 'person-outline' },
 ] as const;
@@ -24,7 +24,7 @@ export default function BottomNavBar() {
           <Pressable
             key={item.href}
             onPress={() => !isActive && router.replace(item.href)}
-            style={styles.item}
+            style={[styles.item, isActive && styles.itemActive]}
           >
             <Ionicons
               name={isActive ? item.icon : item.iconOutline}
@@ -59,7 +59,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 4,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  itemActive: {
+    backgroundColor: 'rgba(37, 150, 190, 0.08)',
   },
   label: {
     fontSize: 11,

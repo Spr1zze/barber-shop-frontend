@@ -9,8 +9,8 @@ export default function TopBar() {
   return (
     <View style={[styles.topbar, { paddingTop: insets.top }]}>
       <Image source={Logo} style={styles.logo} />
-      <Pressable onPress={() => console.log('menu')}>
-        <Ionicons name="menu" size={28} color="#1f2937" />
+      <Pressable onPress={() => console.log('menu')} style={styles.menuButton}>
+        <Ionicons name="menu" size={24} color="#1f2937" />
       </Pressable>
     </View>
   );
@@ -28,5 +28,15 @@ const styles = StyleSheet.create({
     width: 110,
     height: 36,
     resizeMode: 'contain',
+  },
+  menuButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
 });
