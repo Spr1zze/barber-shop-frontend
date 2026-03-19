@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 export default function RootLayout() {
   return (
     <>
-      <StatusBar style="light" backgroundColor="#e6e6e6" />
+      <StatusBar style="dark" backgroundColor="#ffffff" />
       <Slot />
     </>
   );

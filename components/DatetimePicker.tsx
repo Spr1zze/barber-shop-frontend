@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 
-const ACCENT = '#8A7F75';
+const ACCENT = '#17171d';
 
 const AVAILABILITY: Record<string, string[]> = {
   '2025-07-03': ['09:00', '11:00', '14:00'],
@@ -23,9 +23,10 @@ const WEEKDAYS_FULL = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fre
 
 interface Props {
   onSelect?: (date: string | null, time: string | null) => void;
+  variant?: 'default' | 'embedded';
 }
 
-export default function DateTimePicker({ onSelect }: Props) {
+export default function DateTimePicker({ onSelect, variant = 'default' }: Props) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(2025);
   const [month, setMonth] = useState(6);
@@ -105,12 +106,18 @@ export default function DateTimePicker({ onSelect }: Props) {
     return formatDate(selectedDate);
   }, [selectedDate]);
 
-  const actionText = selectedDate && selectedTime ? 'Skift tid' : 'Vælg tid';
+  const actionText = selectedDate && selectedTime ? 'Skift' : 'Åbn';
+  const isEmbedded = variant === 'embedded';
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, isEmbedded && styles.wrapperEmbedded]}>
       <TouchableOpacity
-        style={[styles.trigger, open && styles.triggerOpen]}
+        style={[
+          styles.trigger,
+          isEmbedded && styles.triggerEmbedded,
+          open && styles.triggerOpen,
+          isEmbedded && open && styles.triggerEmbeddedOpen,
+        ]}
         onPress={() => setOpen(o => !o)}
         activeOpacity={0.9}
       >
@@ -127,7 +134,7 @@ export default function DateTimePicker({ onSelect }: Props) {
             <AntDesign
               name={open ? 'up' : 'down'}
               size={11}
-              color="#6D6D6D"
+              color={isEmbedded ? '#5b5460' : '#6D6D6D'}
               style={{ marginTop: 1 }}
             />
           </View>
@@ -135,19 +142,21 @@ export default function DateTimePicker({ onSelect }: Props) {
 
         {selectedDate && selectedTime ? (
           <View style={styles.summaryBlock}>
+            <Text style={styles.summaryLabel}>Valgt tid</Text>
             <Text style={styles.summaryDate}>
               {formattedSelectedDate}, {selectedTime}
             </Text>
           </View>
         ) : (
           <View style={styles.summaryBlock}>
-            <Text style={styles.emptyText}>Ingen tid valgt</Text>
+            <Text style={styles.summaryLabel}>Tidspunkt</Text>
+            <Text style={styles.emptyText}>Vælg dato og tid</Text>
           </View>
         )}
       </TouchableOpacity>
 
       {open && (
-        <View style={styles.panel}>
+        <View style={[styles.panel, isEmbedded && styles.panelEmbedded]}>
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={prevMonth} style={styles.arrow}>
               <AntDesign name="left" size={14} color="#1F1F1F" />
@@ -216,6 +225,7 @@ export default function DateTimePicker({ onSelect }: Props) {
           {selectedDate && (
             <View style={styles.times}>
               <View style={styles.divider} />
+              <Text style={styles.timesTitle}>Ledige tider</Text>
 
               {slots.length > 0 ? (
                 <View style={styles.timesRow}>
@@ -254,25 +264,39 @@ export default function DateTimePicker({ onSelect }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 14,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#d7e5ec',
+    marginBottom: 12,
+    overflow: 'visible',
+  },
+  wrapperEmbedded: {
+    marginBottom: 0,
   },
 
   trigger: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    backgroundColor: '#faf7f2',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#efe9e1',
   },
 
   triggerOpen: {
-    paddingBottom: 0,
+    borderColor: '#ded6cd',
+  },
+  triggerEmbedded: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  triggerEmbeddedOpen: {
+    borderWidth: 0,
   },
 
   triggerTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
 
@@ -282,21 +306,21 @@ const styles = StyleSheet.create({
   },
 
   iconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: 'rgb(178, 206, 219, 14%)',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 9,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#ece5dc',
   },
 
   triggerEyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7b7066',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5f5864',
   },
 
   triggerAction: {
@@ -306,32 +330,49 @@ const styles = StyleSheet.create({
   },
 
   triggerActionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#1f5f7a',
+    color: '#17171d',
   },
 
   summaryBlock: {
-    marginTop: 12,
+    marginTop: 10,
     paddingLeft: 0,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: '#938b95',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
   },
 
   summaryDate: {
     fontSize: 14,
-    color: '#5D5751',
+    color: '#211f25',
+    fontWeight: '600',
   },
 
   emptyText: {
-    fontSize: 14,
-    color: '#6b6f73',
+    fontSize: 13,
+    color: '#76707a',
   },
 
   panel: {
-    marginTop: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
+    marginTop: 10,
+    backgroundColor: '#faf7f2',
+    paddingHorizontal: 14,
     paddingTop: 14,
-    paddingBottom: 16,
+    paddingBottom: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#efe9e1',
+  },
+  panelEmbedded: {
+    marginTop: 12,
+    backgroundColor: '#f4eee6',
+    borderColor: '#e9dfd3',
   },
 
   monthRow: {
@@ -342,21 +383,21 @@ const styles = StyleSheet.create({
   },
 
   monthLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1F1F1F',
+    color: '#1f1e23',
     letterSpacing: -0.2,
   },
 
   arrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f9fc',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#d4e6ef',
+    borderColor: '#ece5dc',
   },
 
   grid: {
@@ -368,15 +409,15 @@ const styles = StyleSheet.create({
   dayHeader: {
     width: `${100 / 7}%`,
     textAlign: 'center',
-    fontSize: 11,
-    color: '#8B847D',
+    fontSize: 10,
+    color: '#8b8590',
     marginBottom: 8,
     fontWeight: '600',
   },
 
   cell: {
     width: `${100 / 7}%`,
-    height: 46,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
@@ -384,16 +425,16 @@ const styles = StyleSheet.create({
   },
 
   cellAvailable: {
-    backgroundColor: '#f3f9fc',
+    backgroundColor: '#ffffff',
   },
 
   cellSelected: {
-    backgroundColor: ACCENT,
+    backgroundColor: '#19181d',
   },
 
   dayText: {
-    fontSize: 14,
-    color: '#232323',
+    fontSize: 13,
+    color: '#232228',
     fontWeight: '500',
   },
 
@@ -403,22 +444,22 @@ const styles = StyleSheet.create({
   },
 
   dayTextFaded: {
-    color: '#b7bec4',
+    color: '#c5c0c8',
   },
 
   dot: {
-    width: 5,
-    height: 5,
+    width: 4,
+    height: 4,
     borderRadius: 999,
     marginTop: 4,
   },
 
   dotGreen: {
-    backgroundColor: '#4C8C68',
+    backgroundColor: '#5a9a73',
   },
 
   dotGrey: {
-    backgroundColor: '#c6d1d8',
+    backgroundColor: '#d2cdd5',
   },
 
   dotSelected: {
@@ -426,42 +467,56 @@ const styles = StyleSheet.create({
   },
 
   times: {
-    marginTop: 12,
+    marginTop: 10,
   },
 
   divider: {
     height: 1,
-    backgroundColor: '#d7e5ec',
-    marginBottom: 14,
+    backgroundColor: '#f0ece7',
+    marginBottom: 12,
+  },
+  timesTitle: {
+    fontSize: 12,
+    color: '#6d6672',
+    fontWeight: '600',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
 
   noTimesText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#66727b',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#7a7480',
   },
 
   timesRow: {
-    gap: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
 
   timeOption: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#d7e5ec',
+    borderWidth: 1,
+    borderColor: '#e6dfd6',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
   },
 
   timeOptionSelected: {
-    borderBottomColor: ACCENT,
+    borderColor: '#19181d',
+    backgroundColor: '#19181d',
   },
 
   timeOptionText: {
-    fontSize: 13,
-    color: '#232323',
+    fontSize: 12,
+    color: '#232228',
     fontWeight: '600',
   },
 
   timeOptionTextSelected: {
-    color: ACCENT,
+    color: '#ffffff',
   },
 });

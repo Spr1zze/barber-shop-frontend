@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const ACCENT = '#2596be';
-const SURFACE = '#fbfcfd';
-const SURFACE_STRONG = '#f4f9fb';
-const TEXT = '#2a2a2a';
-const MUTED = '#7b8791';
+const ACCENT = '#18181d';
+const SURFACE = '#ffffff';
+const SURFACE_STRONG = '#ffffff';
+const TEXT = '#1e1d22';
+const MUTED = '#8c8691';
 
 interface DropdownItem {
   name: string;
@@ -24,6 +24,7 @@ interface DropdownItem {
 interface DropdownProps {
   title: string;
   items: DropdownItem[];
+  variant?: 'default' | 'embedded';
 }
 
 function ItemIcon({ icon, size = 22, selected = false }: { icon: DropdownItem['icon']; size?: number; selected?: boolean }) {
@@ -46,7 +47,7 @@ function ItemIcon({ icon, size = 22, selected = false }: { icon: DropdownItem['i
   return <Ionicons name={icon.name as any} size={icon.size ?? size} color={selected ? ACCENT : '#8f8b86'} />;
 }
 
-export default function Dropdown({ title, items }: DropdownProps) {
+export default function Dropdown({ title, items, variant = 'default' }: DropdownProps) {
   const [selectedItem, setSelectedItem] = useState<DropdownItem | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -82,16 +83,22 @@ export default function Dropdown({ title, items }: DropdownProps) {
 
   const displayItem = selectedItem ?? null;
   const displayIcon = displayItem?.icon ?? items[0]?.icon;
+  const isEmbedded = variant === 'embedded';
 
   return (
-    <View style={[styles.wrapper, isOpen && styles.wrapperOpen]}>
+    <View style={[styles.wrapper, isEmbedded && styles.wrapperEmbedded, isOpen && styles.wrapperOpen]}>
       <TouchableOpacity
-        style={[styles.header, isOpen && styles.headerOpen]}
+        style={[
+          styles.header,
+          isEmbedded && styles.headerEmbedded,
+          isOpen && styles.headerOpen,
+          isEmbedded && isOpen && styles.headerEmbeddedOpen,
+        ]}
         onPress={toggleDropdown}
         activeOpacity={0.7}
       >
         <View style={styles.headerLeft}>
-          <ItemIcon icon={displayIcon} size={32} selected={!!selectedItem} />
+          <ItemIcon icon={displayIcon} size={isEmbedded ? 28 : 32} selected={!!selectedItem} />
 
           <View style={styles.labelGroup}>
             <Text style={styles.labelTitle}>{title}</Text>
@@ -110,10 +117,11 @@ export default function Dropdown({ title, items }: DropdownProps) {
         <Animated.View
           style={[
             styles.dropdownOverlay,
+            isEmbedded && styles.dropdownOverlayEmbedded,
             { opacity: dropdownOpacity },
           ]}
         >
-          <View style={styles.list}>
+          <View style={[styles.list, isEmbedded && styles.listEmbedded]}>
             {items.map((item, index) => {
               const isSelected = selectedItem?.name === item.name;
               return (
@@ -151,27 +159,38 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
+  wrapperEmbedded: {
+    marginBottom: 0,
+  },
   wrapperOpen: {
     zIndex: 99999,
     elevation: 99999,
   },
   header: {
-    minHeight: 56,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: SURFACE,
-    borderRadius: 14,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#dde7ed',
+    borderColor: '#ece8e2',
   },
   headerOpen: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    backgroundColor: '#f8fbfd',
-    borderColor: '#c9dde7',
+    borderColor: '#dbd4cc',
+  },
+  headerEmbedded: {
+    minHeight: 52,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  headerEmbeddedOpen: {
+    borderWidth: 0,
   },
 
   headerLeft: {
@@ -186,17 +205,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   labelTitle: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: MUTED,
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
+    letterSpacing: 0,
     marginBottom: 2,
   },
   labelValue: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#97a2aa',
+    color: '#a8a2ad',
   },
   labelValueSelected: {
     color: TEXT,
@@ -210,35 +228,47 @@ const styles = StyleSheet.create({
     zIndex: 100000,
     elevation: 100000,
   },
+  dropdownOverlayEmbedded: {
+    top: '100%',
+  },
 
   list: {
     backgroundColor: SURFACE_STRONG,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    marginTop: 8,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: '#c9dde7',
+    borderColor: '#ece8e2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+  },
+  listEmbedded: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderColor: '#e8dfd5',
+    shadowOpacity: 0.04,
   },
 
   item: {
-    minHeight: 56,
+    minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   itemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(37, 150, 190, 0.08)',
+    borderBottomColor: '#f1ede8',
   },
   selectedItem: {
-    backgroundColor: 'rgba(37, 150, 190, 0.10)',
+    backgroundColor: '#f6f3ef',
   },
   itemText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
     color: TEXT,
   },

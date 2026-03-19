@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { usePathname } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,10 +11,13 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
+  const pathname = usePathname();
+  const hideTopBar = pathname === '/book-time';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
-        <TopBar />
+        {!hideTopBar && <TopBar />}
         <View style={styles.content}>{children}</View>
         <BottomNavBar />
       </View>
@@ -24,13 +28,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#e6e6e6',
+    backgroundColor: '#ffffff',
   },
   container: {
     flex: 1,
-    backgroundColor: '#e6e6e6',
+    backgroundColor: '#ffffff',
   },
   content: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
 });

@@ -15,15 +15,17 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#17171c',
   },
   subtitle: {
     marginTop: 8,
     fontSize: 16,
-    color: '#dbeafe',
+    color: '#807a86',
+    textAlign: 'center',
   },
 });

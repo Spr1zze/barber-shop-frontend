@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const NAV_ITEMS = [
-  { label: 'Saloner', href: '/book', icon: 'home', iconOutline: 'home-outline' },
-  { label: 'Mine bookinger', href: '/bookings', icon: 'calendar', iconOutline: 'calendar-outline' },
+  { label: 'Udforsk', href: '/', icon: 'search', iconOutline: 'search-outline' },
+  { label: 'Bookinger', href: '/bookings', icon: 'calendar', iconOutline: 'calendar-outline' },
   { label: 'Profil', href: '/profile', icon: 'person', iconOutline: 'person-outline' },
 ] as const;
 
@@ -18,7 +18,7 @@ export default function BottomNavBar() {
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {NAV_ITEMS.map((item) => {
         const isActive = pathname === item.href;
-        const color = isActive ? '#2596be' : '#9ca3af';
+        const color = isActive ? '#19181d' : '#a7a2ad';
 
         return (
           <Pressable
@@ -45,28 +45,23 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 10,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 14,
+    borderTopWidth: 1,
+    borderColor: '#ece8e2',
+    paddingTop: 6,
+    paddingHorizontal: 8,
   },
   item: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
   },
   itemActive: {
-    backgroundColor: 'rgba(37, 150, 190, 0.08)',
+    backgroundColor: 'transparent',
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     textAlign: 'center',
   },
