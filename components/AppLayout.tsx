@@ -11,31 +11,6 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-<<<<<<< HEAD
-    return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-            <View style={styles.container}>
-                <TopBar />
-                <View style={styles.content}>{children}</View>
-                <BottomNavBar />
-            </View>
-        </SafeAreaView>
-    );
-}
-
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#e6e6e6',
-    },
-    container: {
-        flex: 1,
-        backgroundColor: '#e6e6e6',
-    },
-    content: {
-        flex: 1,
-    },
-=======
   const pathname = usePathname();
   const hideTopBar = pathname === '/book-time';
 
@@ -63,5 +38,4 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
->>>>>>> e74c13629de0f150b663cfd61bf44d1e1fc32e56
 });

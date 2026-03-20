@@ -1,33 +1,55 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import { useSalonDetails } from '@/features/salons';
 
 const filters = ['Populære', 'Tilbud', 'DameKlip', 'HerreKlip'];
-
-const treatments = [
-  { name: 'HerreKlip', duration: '30 min.', price: 'Fra 220 kr.' },
-  { name: 'Skin Fade', duration: '45 min.', price: 'Fra 300 kr.' },
-  { name: 'Skæg Trim', duration: '20 min.', price: 'Fra 160 kr.' },
-];
-
-const openingHours = [
-  { day: 'Mandag', hours: '09.00 - 18.00' },
-  { day: 'Tirsdag', hours: '09.00 - 18.00' },
-  { day: 'Onsdag', hours: '09.00 - 18.00' },
-  { day: 'Torsdag', hours: '09.00 - 19.00' },
-  { day: 'Fredag', hours: '09.00 - 18.00' },
-  { day: 'Lørdag', hours: '10.00 - 15.00' },
-  { day: 'Søndag', hours: 'Lukket' },
-];
-
 const WEEKDAYS = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'];
 
-export default function BookingsScreen() {
+export default function SalonScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ salonId?: string }>();
+  const salonId = Array.isArray(params.salonId) ? params.salonId[0] : params.salonId ?? null;
+  const { salon, isLoading, error } = useSalonDetails(salonId);
   const todayName = WEEKDAYS[new Date().getDay()];
   const [selectedFilter, setSelectedFilter] = useState(filters[0]);
-  const [selectedTreatment, setSelectedTreatment] = useState(treatments[0]);
+  const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!salon || selectedTreatmentId) {
+      return;
+    }
+
+    setSelectedTreatmentId(salon.treatments[0]?.id ?? null);
+  }, [salon, selectedTreatmentId]);
+
+  const selectedTreatment = useMemo(() => {
+    if (!salon) {
+      return null;
+    }
+
+    return salon.treatments.find(treatment => treatment.id === selectedTreatmentId) ?? salon.treatments[0] ?? null;
+  }, [salon, selectedTreatmentId]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator size="small" color="#17171d" />
+        <Text style={styles.stateTitle}>Henter salon...</Text>
+      </View>
+    );
+  }
+
+  if (error || !salon) {
+    return (
+      <View style={styles.centeredState}>
+        <Text style={styles.stateTitle}>Kunne ikke hente salon</Text>
+        <Text style={styles.stateText}>{error ?? 'Ukendt fejl.'}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -37,11 +59,11 @@ export default function BookingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerBlock}>
-          <Text style={styles.title}>Downtown Hair</Text>
-          <Text style={styles.status}>Åbent nu · lukker kl. 18.00</Text>
+          <Text style={styles.title}>{salon.name}</Text>
+          <Text style={styles.status}>{salon.status}</Text>
 
           <View style={styles.addressRow}>
-            <Text style={styles.address}>Nørregade 14, 1165 København K</Text>
+            <Text style={styles.address}>{salon.address}</Text>
 
             <TouchableOpacity style={styles.linkButton} activeOpacity={0.8}>
               <Ionicons name="navigate-outline" size={18} color="#6664e8" />
@@ -52,7 +74,7 @@ export default function BookingsScreen() {
 
         <View style={styles.heroSection}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=1200&q=80' }}
+            source={{ uri: salon.heroImageUrl }}
             style={styles.heroImage}
           />
 
@@ -62,7 +84,7 @@ export default function BookingsScreen() {
           </TouchableOpacity>
 
           <View style={styles.imageCounter}>
-            <Text style={styles.imageCounterText}>1 / 1</Text>
+            <Text style={styles.imageCounterText}>{salon.galleryCountLabel}</Text>
           </View>
 
           <TouchableOpacity style={styles.shareButton} activeOpacity={0.85}>
@@ -106,14 +128,14 @@ export default function BookingsScreen() {
           </ScrollView>
 
           <View style={styles.treatmentList}>
-            {treatments.map(treatment => {
-              const isSelected = treatment.name === selectedTreatment.name;
+            {salon.treatments.map(treatment => {
+              const isSelected = treatment.id === selectedTreatment?.id;
 
               return (
                 <TouchableOpacity
-                  key={treatment.name}
+                  key={treatment.id}
                   style={[styles.treatmentCard, isSelected && styles.treatmentCardSelected]}
-                  onPress={() => setSelectedTreatment(treatment)}
+                  onPress={() => setSelectedTreatmentId(treatment.id)}
                   activeOpacity={0.85}
                 >
                   <View style={styles.treatmentInfo}>
@@ -134,31 +156,26 @@ export default function BookingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Om Downtown Hair</Text>
+          <Text style={styles.sectionTitle}>Om {salon.name}</Text>
 
-          <Text style={styles.infoDescription}>
-            Downtown Hair er en moderne barbersalon i indre by med fokus på præcise klip,
-            rolige omgivelser og en enkel oplevelse fra booking til færdigt resultat. Vi
-            arbejder med både klassiske herreklip, fades og skægtrim og lægger vægt på, at
-            du får en behandling, der passer til både stil og hverdag.
-          </Text>
+          <Text style={styles.infoDescription}>{salon.description}</Text>
 
           <View style={styles.infoCard}>
             <Text style={styles.infoCardTitle}>Kontakt</Text>
 
             <View style={styles.contactRow}>
               <Ionicons name="call-outline" size={18} color="#6e6773" />
-              <Text style={styles.contactText}>+45 31 23 45 67</Text>
+              <Text style={styles.contactText}>{salon.contact.phone}</Text>
             </View>
 
             <View style={styles.contactRow}>
               <Ionicons name="mail-outline" size={18} color="#6e6773" />
-              <Text style={styles.contactText}>hej@downtownhair.dk</Text>
+              <Text style={styles.contactText}>{salon.contact.email}</Text>
             </View>
 
             <View style={styles.contactRow}>
               <Ionicons name="location-outline" size={18} color="#6e6773" />
-              <Text style={styles.contactText}>Nørregade 14, 1165 København K</Text>
+              <Text style={styles.contactText}>{salon.contact.address}</Text>
             </View>
           </View>
 
@@ -166,7 +183,7 @@ export default function BookingsScreen() {
             <Text style={styles.infoCardTitle}>Åbningstider</Text>
 
             <View style={styles.hoursList}>
-              {openingHours.map(entry => (
+              {salon.openingHours.map(entry => (
                 <View key={entry.day} style={styles.hoursRow}>
                   <Text style={[styles.hoursDay, entry.day === todayName && styles.hoursTodayText]}>
                     {entry.day}
@@ -184,16 +201,21 @@ export default function BookingsScreen() {
       <View style={styles.bottomBookingBar}>
         <View style={styles.bottomBookingTextWrap}>
           <Text style={styles.bottomBookingLabel}>Valgt behandling</Text>
-          <Text style={styles.bottomBookingTitle}>{selectedTreatment.name}</Text>
+          <Text style={styles.bottomBookingTitle}>{selectedTreatment?.name ?? 'Ingen valgt'}</Text>
           <Text style={styles.bottomBookingMeta}>
-            {selectedTreatment.duration} · {selectedTreatment.price}
+            {selectedTreatment ? `${selectedTreatment.duration} · ${selectedTreatment.price}` : 'Vælg en behandling'}
           </Text>
         </View>
 
         <TouchableOpacity
           style={styles.bookButton}
           activeOpacity={0.9}
-          onPress={() =>
+          disabled={!selectedTreatment}
+          onPress={() => {
+            if (!selectedTreatment) {
+              return;
+            }
+
             router.push({
               pathname: '/book-time',
               params: {
@@ -201,8 +223,8 @@ export default function BookingsScreen() {
                 treatmentDuration: selectedTreatment.duration,
                 treatmentPrice: selectedTreatment.price,
               },
-            })
-          }
+            });
+          }}
         >
           <Text style={styles.bookButtonText}>Book tid</Text>
         </TouchableOpacity>
@@ -221,6 +243,25 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 144,
+  },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 8,
+    backgroundColor: '#ffffff',
+  },
+  stateTitle: {
+    fontSize: 18,
+    color: '#17171d',
+    fontWeight: '700',
+  },
+  stateText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#7c7580',
+    textAlign: 'center',
   },
   headerBlock: {
     paddingHorizontal: 22,
@@ -318,11 +359,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 3,
   },
   section: {
     paddingHorizontal: 22,

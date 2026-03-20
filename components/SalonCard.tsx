@@ -30,11 +30,15 @@ const SalonLocation = [
     }
 ];
 
+type SalonCardProps = {
+    id?: number;
+    onPress?: () => void;
+};
+
 const SalonCard = ({
     id = 0,
-
-    onPress = () => console.log('Book salon')
-}) => {
+    onPress = () => console.log('Open salon')
+}: SalonCardProps) => {
     const salon = SalonLocation[id % SalonLocation.length];
 
     // when i need to navigate to Booking its down here
@@ -58,7 +62,7 @@ const SalonCard = ({
             </View>
 
             {/* Se tider button - bottom right */}
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.8}>
                 <Text style={styles.buttonText}>Se tider</Text>
             </TouchableOpacity>
         </TouchableOpacity>
