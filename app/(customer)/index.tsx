@@ -1,7 +1,11 @@
+<<<<<<< HEAD
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import SearchBar from '@/components/SearchBar';
 import SalonCard from '@/components/SalonCard';
+=======
+import { StyleSheet, Text, View } from 'react-native'; import SearchBar from '@/components/SearchBar';
+>>>>>>> e74c13629de0f150b663cfd61bf44d1e1fc32e56
 
 export default function SalonList() {
     return (
