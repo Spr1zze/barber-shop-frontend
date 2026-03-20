@@ -6,31 +6,31 @@ import BottomNavBar from '@/components/BottomNavBar';
 import TopBar from '@/components/TopBar';
 
 interface AppLayoutProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={styles.container}>
-        <TopBar />
-        <View style={styles.content}>{children}</View>
-        <BottomNavBar />
-      </View>
-    </SafeAreaView>
-  );
+    return (
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+            <View style={styles.container}>
+                <TopBar />
+                <View style={styles.content}>{children}</View>
+                <BottomNavBar />
+            </View>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#e6e6e6',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#e6e6e6',
-  },
-  content: {
-    flex: 1,
-  },
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#e6e6e6',
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#e6e6e6',
+    },
+    content: {
+        flex: 1,
+    },
 });
