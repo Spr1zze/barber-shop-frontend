@@ -59,7 +59,14 @@ export default function SalonScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerBlock}>
-          <Text style={styles.title}>{salon.name}</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
+              <Ionicons name="arrow-back" size={20} color="#2d2930" />
+            </TouchableOpacity>
+
+            <Text style={styles.title}>{salon.name}</Text>
+          </View>
+
           <Text style={styles.status}>{salon.status}</Text>
 
           <View style={styles.addressRow}>
@@ -269,7 +276,19 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: '#ffffff',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  backButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
+    flex: 1,
     fontSize: 42,
     fontWeight: '800',
     color: '#17171d',

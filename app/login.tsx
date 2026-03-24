@@ -1,15 +1,34 @@
-import { useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace(returnTo ?? '/book-time');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View>
-          <Text style={styles.title}>Log ind eller opret bruger</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.85}>
+              <Ionicons name="arrow-back" size={20} color="#2d2930" />
+            </TouchableOpacity>
+
+            <Text style={styles.title}>Log ind eller opret bruger</Text>
+          </View>
+
           <Text style={styles.subtitle}>
             Du skal være logget ind for at færdiggøre din booking.
           </Text>
@@ -24,10 +43,6 @@ export default function LoginScreen() {
             <Text style={styles.secondaryButtonText}>Opret bruger</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.8}>
-          <Text style={styles.backText}>Tilbage</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -42,11 +57,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 36,
+    paddingTop: 20,
     paddingBottom: 32,
     backgroundColor: '#ffffff',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  backButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
+    flex: 1,
     fontSize: 36,
     lineHeight: 40,
     fontWeight: '800',
@@ -87,10 +114,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#17171d',
-  },
-  backText: {
-    fontSize: 15,
-    color: '#7c7580',
-    fontWeight: '600',
   },
 });
