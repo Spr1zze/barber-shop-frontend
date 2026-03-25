@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import SalonCard from '@/components/SalonCard';
 import SearchBar from '@/components/SearchBar';
 
-const TEST_SALON_ID = 'downtown-hair';
+const TEST_SALON_ID = 'klippekrogen';
 const SALON_CARD_IDS = [TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID];
 
 export default function SalonList() {
