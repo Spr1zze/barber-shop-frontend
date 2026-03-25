@@ -1,18 +1,25 @@
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from "expo-router";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import SalonCard from '@/components/SalonCard';
-import SearchBar from '@/components/SearchBar';
+import SalonCard from "@/components/SalonCard";
+import SearchBar from "@/components/SearchBar";
 
-const TEST_SALON_ID = 'downtown-hair';
-const SALON_CARD_IDS = [TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID, TEST_SALON_ID];
+const TEST_SALON_ID = "downtown-hair";
+const SALON_CARD_IDS = [
+  TEST_SALON_ID,
+  TEST_SALON_ID,
+  TEST_SALON_ID,
+  TEST_SALON_ID,
+  TEST_SALON_ID,
+  TEST_SALON_ID,
+];
 
 export default function SalonList() {
   const router = useRouter();
 
   const handleOpenSalon = (salonId: string = TEST_SALON_ID) => {
     router.push({
-      pathname: '/salon',
+      pathname: "/salon",
       params: { salonId },
     });
   };
@@ -43,21 +50,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#2b2b2b',
+    fontWeight: "700",
+    color: "#2b2b2b",
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#007BFF',
+    backgroundColor: "#007BFF",
     padding: 10,
     borderRadius: 5,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
     marginBottom: 16,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
