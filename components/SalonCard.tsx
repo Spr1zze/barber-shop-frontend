@@ -1,67 +1,91 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { API_BASE_URL } from '@/features/salons/lib/GetApiBaseURL';
 import { MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// 4 predefined salons
-const SalonLocation = [
-    {
-        name: "Downtown Hair",
-        address: "Nørre Gade 14",
-        distance: "800 m",
-        Image: require("@/assets/images/DowntownHair.jpeg")
-    },
-    {
-        name: "Style House",
-        address: "Frederiksborrgade 27",
-        distance: "1.4 km",
-        Image: require("@/assets/images/StyleHouse.jpg")
-    },
-    {
-        name: "Bella Salon",
-        address: "Østerbrogade 56",
-        distance: "1.7 km",
-        Image: require("@/assets/images/BellaSalon.jpg")
-    },
-    {
-        name: "Trendy Cuts",
-        address: "Gammel kongevej 22",
-        distance: "2.5 km",
-        Image: require("@/assets/images/TrendyCuts.jpg")
-    }
-];
+type Salon = {
+    Name: string;
+    Address: string;
+};
 
 type SalonCardProps = {
-    id?: number;
+    id: number;
     onPress?: () => void;
 };
 
-const SalonCard = ({
-    id = 0,
-    onPress = () => console.log('Open salon')
-}: SalonCardProps) => {
-    const salon = SalonLocation[id % SalonLocation.length];
+const SalonCard = ({ id, onPress }: SalonCardProps) => {
+    const [salons, setSalons] = useState<Salon[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // when i need to navigate to Booking its down here
+    useEffect(() => {
+        const fetchSalons = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/salon/details`);
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                const data = await response.json();
+                setSalons(Array.isArray(data) ? data : []);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Fetch failed');
+                console.error('Fetch error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSalons();
+    }, []);
+
+    if (loading) {
+        return (
+            <View style={styles.card}>
+                <View style={styles.imageSkeleton} />
+                <View style={styles.textContainer}>
+                    <View style={styles.nameSkeleton} />
+                    <View style={styles.addressRow}>
+                        <View style={styles.iconSkeleton} />
+                        <View style={styles.addressSkeleton} />
+                    </View>
+                    <View style={styles.distanceSkeleton} />
+                </View>
+                <View style={styles.buttonSkeleton} />
+            </View>
+        );
+    }
+
+    if (error || salons.length === 0) {
+        return (
+            <View style={styles.card}>
+                <View style={styles.textContainer}>
+                    <Text style={styles.errorText}>{error || 'No salons available'}</Text>
+                </View>
+            </View>
+        );
+    }
+
+    const salon = salons[id % salons.length];
 
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-            <Image source={salon.Image} style={styles.image} />
+            <Image
+                source={require("@/assets/images/DowntownHair.jpeg")}
+                style={styles.image}
+            />
 
-            {/* Text content next to image */}
             <View style={styles.textContainer}>
-                <Text style={styles.name} numberOfLines={1}>{salon.name}</Text>
+                <Text style={styles.name} numberOfLines={1}>{salon.Name}</Text>
 
-                {/* Address line with icon */}
                 <View style={styles.addressRow}>
                     <MaterialIcons name="location-on" size={16} color="#666" style={styles.icon} />
-                    <Text style={styles.address} numberOfLines={2}>{salon.address}</Text>
+                    <Text style={styles.address} numberOfLines={2}>{salon.Address}</Text>
                 </View>
 
-                {/* Distance under address but next to image */}
-                <Text style={styles.distance}>{salon.distance}</Text>
+                <Text style={styles.distance}>Distance TBD</Text>
             </View>
 
-            {/* Se tider button - bottom right */}
             <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.8}>
                 <Text style={styles.buttonText}>Se tider</Text>
             </TouchableOpacity>
@@ -69,11 +93,10 @@ const SalonCard = ({
     );
 };
 
-
 const styles = StyleSheet.create({
     card: {
-        flexDirection: 'row',           // ← Row layout: image | text | button
-        alignItems: 'flex-start',       // ← Align to top
+        flexDirection: 'row',
+        alignItems: 'flex-start',
         backgroundColor: 'white',
         borderRadius: 16,
         padding: 16,
@@ -90,16 +113,30 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 12,
-        marginRight: 16,                // ← Space between image and text
+        marginRight: 16,
+    },
+    imageSkeleton: {
+        width: 80,
+        height: 80,
+        borderRadius: 12,
+        marginRight: 16,
+        backgroundColor: '#E0E0E0',
     },
     textContainer: {
-        flex: 1,                        // ← Takes remaining space next to image
-        flexDirection: 'column',        // ← Name, address, distance stack vertically
+        flex: 1,
+        flexDirection: 'column',
     },
     name: {
         fontSize: 18,
         fontWeight: '700',
         color: '#000',
+        marginBottom: 4,
+    },
+    nameSkeleton: {
+        width: 120,
+        height: 20,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 4,
         marginBottom: 4,
     },
     addressRow: {
@@ -111,16 +148,38 @@ const styles = StyleSheet.create({
         marginRight: 6,
         marginTop: 1,
     },
+    iconSkeleton: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#E0E0E0',
+        marginRight: 6,
+        marginTop: 1,
+    },
     address: {
         fontSize: 15,
         color: '#666',
         flex: 1,
         lineHeight: 20,
     },
+    addressSkeleton: {
+        flex: 1,
+        height: 16,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 4,
+        marginLeft: 6,
+    },
     distance: {
         fontSize: 14,
         color: '#999',
         fontWeight: '600',
+        marginTop: 2,
+    },
+    distanceSkeleton: {
+        width: 60,
+        height: 14,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 4,
         marginTop: 2,
     },
     button: {
@@ -135,10 +194,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    buttonSkeleton: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        width: 80,
+        height: 32,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 20,
+    },
     buttonText: {
         color: 'white',
         fontSize: 14,
         fontWeight: '700',
+    },
+    errorText: {
+        fontSize: 15,
+        color: '#999',
+        textAlign: 'center',
+        flex: 1,
     },
 });
 

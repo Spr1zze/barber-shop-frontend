@@ -1,10 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const DAYS_SHORT = ['søn.', 'man.', 'tir.', 'ons.', 'tor.', 'fre.', 'lør.'];
 const MONTHS = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December'];
+const DAYS_LONG = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'];
+const MONTHS_SHORT = ['jan.', 'feb.', 'mar.', 'apr.', 'maj', 'jun.', 'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.'];
+
+type Assistant = {
+  id: string;
+  name: string;
+  avatar: string;
+  availability: Record<string, string[]>;
+};
+
+type SelectedSlot = {
+  assistantId: string;
+  assistantName: string;
+  time: string;
+};
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -26,6 +41,10 @@ function dayDiff(from: Date, to: Date) {
   return Math.round((b - a) / 86400000);
 }
 
+function formatSelectedDate(date: Date) {
+  return `${DAYS_LONG[date.getDay()]} ${date.getDate()}. ${MONTHS_SHORT[date.getMonth()]}`;
+}
+
 export default function BookTimeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -41,8 +60,9 @@ export default function BookTimeScreen() {
   const today = useMemo(() => startOfDay(new Date()), []);
   const [rangeOffset, setRangeOffset] = useState(0);
   const [selectedDateKey, setSelectedDateKey] = useState(toKey(today));
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
 
-  const assistants = useMemo(() => {
+  const assistants = useMemo<Assistant[]>(() => {
     const keys = Array.from({ length: 14 }, (_, index) => toKey(addDays(today, index)));
 
     return [
@@ -126,9 +146,18 @@ export default function BookTimeScreen() {
     ? `${availableAssistants.length} frisører har tilsammen ${totalSlots} ledige tider.`
     : 'Ingen ledige tider denne dag. Prøv en anden dag eller tryk på første ledige tid.';
   const canGoBack = rangeOffset > 0;
+  const selectedDateLabel = formatSelectedDate(selectedDate);
+  const selectedBookingLabel = selectedSlot
+    ? `${selectedDateLabel} kl. ${selectedSlot.time}`
+    : 'Vælg en tid for at fortsætte';
 
   const openLogin = () => {
-    router.push('/login');
+    router.push({
+      pathname: '/login',
+      params: {
+        returnTo: '/book-time',
+      },
+    });
   };
 
   const jumpToDate = (date: Date) => {
@@ -136,151 +165,198 @@ export default function BookTimeScreen() {
     setRangeOffset(Math.floor(dayDiff(today, date) / 7) * 7);
   };
 
+  useEffect(() => {
+    if (!selectedSlot) {
+      return;
+    }
+
+    const assistant = assistants.find(entry => entry.id === selectedSlot.assistantId);
+    const timeSlots = assistant?.availability[selectedDateKey] ?? [];
+
+    if (!timeSlots.includes(selectedSlot.time)) {
+      setSelectedSlot(null);
+    }
+  }, [assistants, selectedDateKey, selectedSlot]);
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.topSection}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
-            <Ionicons name="arrow-back" size={18} color="#5a5661" />
-          </TouchableOpacity>
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.topSection}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
+              <Ionicons name="arrow-back" size={20} color="#2d2930" />
+            </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>{treatmentName}</Text>
-        </View>
-
-        <Text style={styles.headerMeta}>{treatmentPrice} · {treatmentDuration}</Text>
-
-        <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickButton} onPress={() => jumpToDate(today)} activeOpacity={0.85}>
-            <Text style={styles.quickButtonText}>I dag</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickButton, styles.quickButtonWide]}
-            onPress={() => jumpToDate(firstAvailableDate)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.quickButtonText}>Første ledige tid</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickIconButton, styles.quickIconButtonMuted]}
-            onPress={() => canGoBack && setRangeOffset(current => current - 7)}
-            activeOpacity={canGoBack ? 0.85 : 1}
-            disabled={!canGoBack}
-          >
-            <Ionicons name="chevron-back" size={18} color={canGoBack ? '#6f6975' : '#d0cad3'} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickIconButton}
-            onPress={() => setRangeOffset(current => current + 7)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="chevron-forward" size={18} color="#2d2930" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.monthRow}>
-          <Text style={styles.monthTitle}>
-            {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
-          </Text>
-
-          <View style={styles.availabilityInline}>
-            <Text style={[styles.availabilityInlineTitle, totalSlots === 0 && styles.availabilityInlineTitleMuted]}>
-              {totalSlots > 0 ? 'Ledige tider' : 'Ingen ledige tider'}
-            </Text>
-            <Text style={styles.availabilityInlineText}>{availabilityMessage}</Text>
+            <Text style={styles.headerTitle}>{treatmentName}</Text>
           </View>
-        </View>
-      </View>
 
-      <View style={styles.dayStrip}>
-        {visibleDates.map(date => {
-          const dateKey = toKey(date);
-          const isSelected = selectedDateKey === dateKey;
-          const isDisabled = !hasAnyTimes(dateKey);
+          <Text style={styles.headerMeta}>{treatmentPrice} · {treatmentDuration}</Text>
 
-          return (
+          <View style={styles.quickRow}>
+            <TouchableOpacity style={styles.quickButton} onPress={() => jumpToDate(today)} activeOpacity={0.85}>
+              <Text style={styles.quickButtonText}>I dag</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
-              key={dateKey}
-              style={[
-                styles.dayCard,
-                isSelected && styles.dayCardSelected,
-                isDisabled && styles.dayCardDisabled,
-              ]}
-              disabled={isDisabled}
-              onPress={() => setSelectedDateKey(dateKey)}
+              style={[styles.quickButton, styles.quickButtonWide]}
+              onPress={() => jumpToDate(firstAvailableDate)}
               activeOpacity={0.85}
             >
-              <Text
-                style={[
-                  styles.dayNumber,
-                  isSelected && styles.dayNumberSelected,
-                  isDisabled && styles.dayTextDisabled,
-                ]}
-              >
-                {date.getDate()}
-              </Text>
-              <Text
-                style={[
-                  styles.dayLabel,
-                  isSelected && styles.dayLabelSelected,
-                  isDisabled && styles.dayTextDisabled,
-                ]}
-              >
-                {DAYS_SHORT[date.getDay()]}
-              </Text>
+              <Text style={styles.quickButtonText}>Første ledige tid</Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
 
-      <View style={styles.assistantList}>
-        {assistants.map(assistant => {
-          const timeSlots = assistant.availability[selectedDateKey] ?? [];
+            <TouchableOpacity
+              style={[styles.quickIconButton, styles.quickIconButtonMuted]}
+              onPress={() => canGoBack && setRangeOffset(current => current - 7)}
+              activeOpacity={canGoBack ? 0.85 : 1}
+              disabled={!canGoBack}
+            >
+              <Ionicons name="chevron-back" size={18} color={canGoBack ? '#6f6975' : '#d0cad3'} />
+            </TouchableOpacity>
 
-          return (
-            <View key={assistant.id} style={styles.assistantSection}>
-              <View style={styles.assistantHeader}>
-                <Image source={{ uri: assistant.avatar }} style={styles.assistantAvatar} />
+            <TouchableOpacity
+              style={styles.quickIconButton}
+              onPress={() => setRangeOffset(current => current + 7)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chevron-forward" size={18} color="#2d2930" />
+            </TouchableOpacity>
+          </View>
 
-                <View style={styles.assistantInfo}>
-                  <Text style={styles.assistantName}>{assistant.name}</Text>
-                  <Text style={styles.assistantMeta}>{treatmentPrice} ({treatmentDuration})</Text>
-                  <Text style={styles.assistantStatus}>
-                    {timeSlots.length > 0 ? `${timeSlots.length} ledige tider` : 'Ingen ledige tider i dag'}
-                  </Text>
-                </View>
-              </View>
+          <View style={styles.monthRow}>
+            <Text style={styles.monthTitle}>
+              {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+            </Text>
 
-              {timeSlots.length > 0 ? (
-                <View style={styles.timesGrid}>
-                  {timeSlots.map(time => (
-                    <TouchableOpacity
-                      key={`${assistant.id}-${time}`}
-                      style={styles.timeButton}
-                      activeOpacity={0.85}
-                      onPress={openLogin}
-                    >
-                      <Text style={styles.timeButtonText}>{time}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.unavailableCard}>
-                  <Text style={styles.unavailableText}>Ingen ledige tider</Text>
-                  <Text style={styles.unavailableSubtext}>Prøv en anden dato eller vælg første ledige tid.</Text>
-                </View>
-              )}
+            <View style={styles.availabilityInline}>
+              <Text style={[styles.availabilityInlineTitle, totalSlots === 0 && styles.availabilityInlineTitleMuted]}>
+                {totalSlots > 0 ? 'Ledige tider' : 'Ingen ledige tider'}
+              </Text>
+              <Text style={styles.availabilityInlineText}>{availabilityMessage}</Text>
             </View>
-          );
-        })}
+          </View>
+        </View>
+
+        <View style={styles.dayStrip}>
+          {visibleDates.map(date => {
+            const dateKey = toKey(date);
+            const isSelected = selectedDateKey === dateKey;
+            const isDisabled = !hasAnyTimes(dateKey);
+
+            return (
+              <TouchableOpacity
+                key={dateKey}
+                style={[
+                  styles.dayCard,
+                  isSelected && styles.dayCardSelected,
+                  isDisabled && styles.dayCardDisabled,
+                ]}
+                disabled={isDisabled}
+                onPress={() => setSelectedDateKey(dateKey)}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    isSelected && styles.dayNumberSelected,
+                    isDisabled && styles.dayTextDisabled,
+                  ]}
+                >
+                  {date.getDate()}
+                </Text>
+                <Text
+                  style={[
+                    styles.dayLabel,
+                    isSelected && styles.dayLabelSelected,
+                    isDisabled && styles.dayTextDisabled,
+                  ]}
+                >
+                  {DAYS_SHORT[date.getDay()]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.assistantList}>
+          {assistants.map(assistant => {
+            const timeSlots = assistant.availability[selectedDateKey] ?? [];
+
+            return (
+              <View key={assistant.id} style={styles.assistantSection}>
+                <View style={styles.assistantHeader}>
+                  <Image source={{ uri: assistant.avatar }} style={styles.assistantAvatar} />
+
+                  <View style={styles.assistantInfo}>
+                    <Text style={styles.assistantName}>{assistant.name}</Text>
+                    <Text style={styles.assistantMeta}>{treatmentPrice} ({treatmentDuration})</Text>
+                    <Text style={styles.assistantStatus}>
+                      {timeSlots.length > 0 ? `${timeSlots.length} ledige tider` : 'Ingen ledige tider i dag'}
+                    </Text>
+                  </View>
+                </View>
+
+                {timeSlots.length > 0 ? (
+                  <View style={styles.timesGrid}>
+                    {timeSlots.map(time => {
+                      const isSelected =
+                        selectedSlot?.assistantId === assistant.id && selectedSlot.time === time;
+
+                      return (
+                        <TouchableOpacity
+                          key={`${assistant.id}-${time}`}
+                          style={[styles.timeButton, isSelected && styles.timeButtonSelected]}
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            setSelectedSlot({
+                              assistantId: assistant.id,
+                              assistantName: assistant.name,
+                              time,
+                            })
+                          }
+                        >
+                          <Text style={[styles.timeButtonText, isSelected && styles.timeButtonTextSelected]}>
+                            {time}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={styles.unavailableCard}>
+                    <Text style={styles.unavailableText}>Ingen ledige tider</Text>
+                    <Text style={styles.unavailableSubtext}>Prøv en anden dato eller vælg første ledige tid.</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomBookingBar}>
+        <View style={styles.selectionSummary}>
+          <Text style={styles.selectionLabel}>Valgt tid</Text>
+          <Text style={styles.selectionValue}>{selectedBookingLabel}</Text>
+          <Text style={styles.selectionMeta}>
+            {selectedSlot ? `${selectedSlot.assistantName} · ${treatmentName}` : 'Ingen tid valgt endnu'}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.bookButton, !selectedSlot && styles.bookButtonDisabled]}
+          activeOpacity={selectedSlot ? 0.9 : 1}
+          disabled={!selectedSlot}
+          onPress={openLogin}
+        >
+          <Text style={styles.bookButtonText}>Book nu</Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -289,26 +365,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 28,
   },
   topSection: {
-    paddingBottom: 10,
+    paddingBottom: 14,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
   },
   headerTitle: {
     flex: 1,
@@ -319,8 +396,8 @@ const styles = StyleSheet.create({
   },
   headerMeta: {
     marginTop: 8,
-    marginLeft: 46,
-    fontSize: 12,
+    marginLeft: 34,
+    fontSize: 13,
     color: '#8a8490',
   },
   quickRow: {
@@ -334,8 +411,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e7e1d9',
-    backgroundColor: '#fbfaf8',
+    borderColor: '#e6e1eb',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -352,17 +429,17 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e7e1d9',
-    backgroundColor: '#fbfaf8',
+    borderColor: '#e6e1eb',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   quickIconButtonMuted: {
-    borderColor: '#ece7ee',
+    borderColor: '#ece8f1',
   },
   monthRow: {
     marginTop: 14,
-    gap: 4,
+    gap: 6,
   },
   monthTitle: {
     fontSize: 28,
@@ -389,28 +466,28 @@ const styles = StyleSheet.create({
   dayStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 3,
-    paddingTop: 10,
-    paddingBottom: 2,
+    gap: 4,
+    paddingTop: 6,
+    paddingBottom: 4,
   },
   dayCard: {
     flex: 1,
     minWidth: 0,
-    minHeight: 64,
-    borderRadius: 10,
+    minHeight: 68,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#706a75',
+    borderColor: '#dfdbe4',
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayCardSelected: {
     backgroundColor: '#1d1c22',
-    borderColor: '#4f4b55',
+    borderColor: '#1d1c22',
   },
   dayCardDisabled: {
-    borderColor: '#d6d1d8',
-    backgroundColor: '#ffffff',
+    borderColor: '#ece8f1',
+    backgroundColor: '#faf9fc',
   },
   dayNumber: {
     fontSize: 18,
@@ -433,11 +510,16 @@ const styles = StyleSheet.create({
     color: '#ddd8df',
   },
   assistantList: {
-    gap: 14,
-    paddingTop: 12,
+    gap: 18,
+    paddingTop: 14,
   },
   assistantSection: {
-    gap: 8,
+    gap: 12,
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#efebf3',
   },
   assistantHeader: {
     flexDirection: 'row',
@@ -472,8 +554,8 @@ const styles = StyleSheet.create({
   },
   unavailableCard: {
     minHeight: 72,
-    borderRadius: 14,
-    backgroundColor: '#f3f3f5',
+    borderRadius: 16,
+    backgroundColor: '#f4f2f7',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
@@ -492,27 +574,81 @@ const styles = StyleSheet.create({
   timesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
+    gap: 8,
   },
   timeButton: {
-    width: '23%',
-    minHeight: 40,
-    borderRadius: 10,
+    width: '22.8%',
+    minHeight: 46,
+    borderRadius: 14,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#ece7df',
+    borderWidth: 1.5,
+    borderColor: '#e7e2ec',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 1,
+  },
+  timeButtonSelected: {
+    backgroundColor: '#1d1c22',
+    borderColor: '#1d1c22',
   },
   timeButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#4d4753',
-    fontWeight: '500',
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  timeButtonTextSelected: {
+    color: '#ffffff',
+  },
+  bottomBookingBar: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderColor: '#ece4da',
+    backgroundColor: '#ffffff',
+    gap: 12,
+  },
+  selectionSummary: {
+    borderRadius: 18,
+    backgroundColor: '#f7f5fa',
+    borderWidth: 1,
+    borderColor: '#ece8f1',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  selectionLabel: {
+    fontSize: 11,
+    color: '#857d86',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  selectionValue: {
+    marginTop: 6,
+    fontSize: 17,
+    color: '#18171d',
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  selectionMeta: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#6d6671',
+  },
+  bookButton: {
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: '#18171d',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookButtonDisabled: {
+    backgroundColor: '#d5d1da',
+  },
+  bookButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '800',
     letterSpacing: -0.2,
   },
 });

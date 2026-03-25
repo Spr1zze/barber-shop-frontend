@@ -1,8 +1,8 @@
 import type { SalonData } from '@/features/salons/types/salon';
 
 export const MOCK_SALONS: Record<string, SalonData> = {
-  'downtown-hair': {
-    id: 'downtown-hair',
+  'klippekrogen': {
+    id: 'klippekrogen',
     name: 'Downtown Hair',
     status: 'Åbent nu · lukker kl. 18.00',
     address: 'Nørregade 14, 1165 København K',
