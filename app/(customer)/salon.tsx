@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { useSalonDetails } from '@/features/salons';
 
@@ -226,6 +226,8 @@ export default function SalonScreen() {
             router.push({
               pathname: '/book-time',
               params: {
+                salonId,
+                treatmentId: selectedTreatment.id,
                 treatmentName: selectedTreatment.name,
                 treatmentDuration: selectedTreatment.duration,
                 treatmentPrice: selectedTreatment.price,

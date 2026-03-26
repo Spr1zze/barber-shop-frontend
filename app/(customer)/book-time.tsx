@@ -1,25 +1,42 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import type { SalonAvailabilitySlot, SalonBarber, SalonTreatment } from '@/features/salons';
+import { useSalonBarbers, useSalonDetails } from '@/features/salons';
+import { createSalonBooking } from '@/features/salons/api/createSalonBooking';
+import { loadSalonAvailability } from '@/features/salons/api/loadSalonAvailability';
 
 const DAYS_SHORT = ['søn.', 'man.', 'tir.', 'ons.', 'tor.', 'fre.', 'lør.'];
 const MONTHS = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December'];
 const DAYS_LONG = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'];
 const MONTHS_SHORT = ['jan.', 'feb.', 'mar.', 'apr.', 'maj', 'jun.', 'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.'];
-
-type Assistant = {
-  id: string;
-  name: string;
-  avatar: string;
-  availability: Record<string, string[]>;
-};
+const MAX_LOOKAHEAD_DAYS = 21;
 
 type SelectedSlot = {
-  assistantId: string;
-  assistantName: string;
-  time: string;
+  barberId: string;
+  barberName: string;
+  slot: SalonAvailabilitySlot;
 };
+
+type BookTimeSearchParams = {
+  salonId?: string | string[];
+  treatmentId?: string | string[];
+  treatmentName?: string | string[];
+  treatmentDuration?: string | string[];
+  treatmentPrice?: string | string[];
+};
+
+type AvailabilityCache = Record<string, SalonAvailabilitySlot[]>;
+
+function readParam(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -45,138 +62,341 @@ function formatSelectedDate(date: Date) {
   return `${DAYS_LONG[date.getDay()]} ${date.getDate()}. ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
+function buildAvailabilityCacheKey(barberId: string, treatmentId: string, dateKey: string) {
+  return `${barberId}::${treatmentId}::${dateKey}`;
+}
+
+function formatTimeFromIso(iso: string) {
+  const date = new Date(iso);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}.${minutes}`;
+}
+
+function formatSlotLong(iso: string) {
+  const date = new Date(iso);
+  return `${DAYS_LONG[date.getDay()]} d. ${date.getDate()}. ${MONTHS_SHORT[date.getMonth()]} kl. ${formatTimeFromIso(iso)}`;
+}
+
 export default function BookTimeScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    treatmentName?: string;
-    treatmentDuration?: string;
-    treatmentPrice?: string;
-  }>();
+  const params = useLocalSearchParams<BookTimeSearchParams>();
 
-  const treatmentName = Array.isArray(params.treatmentName) ? params.treatmentName[0] : params.treatmentName || 'HerreKlip';
-  const treatmentDuration = Array.isArray(params.treatmentDuration) ? params.treatmentDuration[0] : params.treatmentDuration || '30 min.';
-  const treatmentPrice = Array.isArray(params.treatmentPrice) ? params.treatmentPrice[0] : params.treatmentPrice || 'Fra 220 kr.';
+  const salonId = readParam(params.salonId);
+  const initialTreatmentId = readParam(params.treatmentId);
+  const fallbackTreatmentName = readParam(params.treatmentName) ?? 'Behandling';
+  const fallbackTreatmentDuration = readParam(params.treatmentDuration) ?? '';
+  const fallbackTreatmentPrice = readParam(params.treatmentPrice) ?? '';
 
-  const today = useMemo(() => startOfDay(new Date()), []);
-  const [rangeOffset, setRangeOffset] = useState(0);
-  const [selectedDateKey, setSelectedDateKey] = useState(toKey(today));
+  const { salon, isLoading: isSalonLoading, error: salonError } = useSalonDetails(salonId ?? null);
+  const { barbers, isLoading: isBarbersLoading, error: barbersError } = useSalonBarbers(salonId ?? null);
+
+  const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(initialTreatmentId);
+  const [selectedBarberId, setSelectedBarberId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [rangeOffset, setRangeOffset] = useState(0);
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const [selectedDateKey, setSelectedDateKey] = useState(toKey(today));
+  const selectedDate = useMemo(() => {
+    const [year, month, day] = selectedDateKey.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }, [selectedDateKey]);
 
-  const assistants = useMemo<Assistant[]>(() => {
-    const keys = Array.from({ length: 14 }, (_, index) => toKey(addDays(today, index)));
+  const [availabilityCache, setAvailabilityCache] = useState<AvailabilityCache>({});
+  const availabilityCacheRef = useRef<AvailabilityCache>({});
+  const [availabilityLoadingKey, setAvailabilityLoadingKey] = useState<string | null>(null);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [isSearchingFirstAvailable, setIsSearchingFirstAvailable] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
-    return [
-      {
-        id: 'sofie',
-        name: 'Sofie Lund',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&q=80',
-        availability: {
-          [keys[0]]: [],
-          [keys[1]]: ['10.00', '10.30', '11.00'],
-          [keys[2]]: [],
-          [keys[3]]: ['12.00', '12.30'],
-          [keys[4]]: ['09.30'],
-          [keys[5]]: [],
-          [keys[6]]: [],
-          [keys[7]]: ['13.00'],
-          [keys[8]]: ['10.15', '11.15'],
-          [keys[9]]: [],
-          [keys[10]]: ['09.45', '10.45', '11.45'],
-          [keys[11]]: ['12.15'],
-          [keys[12]]: [],
-          [keys[13]]: ['14.15'],
-        } as Record<string, string[]>,
-      },
-      {
-        id: 'mads',
-        name: 'Mads Nørgaard',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&q=80',
-        availability: {
-          [keys[0]]: ['11.00', '11.15', '11.30', '11.45', '12.00', '12.15', '12.30', '12.45', '13.00', '13.15', '13.30', '13.45'],
-          [keys[1]]: ['10.00', '10.15', '10.30', '11.00', '11.30'],
-          [keys[2]]: ['12.00', '12.30', '13.00'],
-          [keys[3]]: ['10.30', '11.00', '11.30', '12.00'],
-          [keys[4]]: ['09.00', '09.30', '10.00', '10.30'],
-          [keys[5]]: ['11.00', '11.30'],
-          [keys[6]]: [],
-          [keys[7]]: ['14.00', '14.30'],
-          [keys[8]]: ['10.00', '10.15', '10.30', '10.45'],
-          [keys[9]]: ['11.00', '11.15'],
-          [keys[10]]: [],
-          [keys[11]]: ['12.30', '12.45', '13.00'],
-          [keys[12]]: ['09.30', '09.45', '10.00'],
-          [keys[13]]: ['15.00', '15.15'],
-        } as Record<string, string[]>,
-      },
-    ];
-  }, [today]);
+  useEffect(() => {
+    availabilityCacheRef.current = availabilityCache;
+  }, [availabilityCache]);
+
+  useEffect(() => {
+    if (!salon) {
+      return;
+    }
+
+    if (selectedTreatmentId && salon.treatments.some(treatment => treatment.id === selectedTreatmentId)) {
+      return;
+    }
+
+    setSelectedTreatmentId(salon.treatments[0]?.id ?? null);
+  }, [salon, selectedTreatmentId]);
+
+  useEffect(() => {
+    if (barbers.length === 0) {
+      setSelectedBarberId(null);
+      return;
+    }
+
+    if (selectedBarberId && barbers.some(barber => barber.id === selectedBarberId)) {
+      return;
+    }
+
+    setSelectedBarberId(barbers[0].id);
+  }, [barbers, selectedBarberId]);
+
+  const selectedTreatment: SalonTreatment | null = useMemo(() => {
+    if (!salon || !selectedTreatmentId) {
+      return null;
+    }
+
+    return salon.treatments.find(treatment => treatment.id === selectedTreatmentId) ?? null;
+  }, [salon, selectedTreatmentId]);
+
+  const headerPrice = useMemo(() => {
+    if (selectedTreatment?.price) {
+      return selectedTreatment.price;
+    }
+
+    if (fallbackTreatmentPrice) {
+      return fallbackTreatmentPrice;
+    }
+
+    return fallbackTreatmentName;
+  }, [selectedTreatment?.price, fallbackTreatmentPrice, fallbackTreatmentName]);
+
+  const headerDuration = useMemo(() => {
+    if (selectedTreatment?.duration) {
+      return selectedTreatment.duration;
+    }
+
+    if (fallbackTreatmentDuration) {
+      return fallbackTreatmentDuration;
+    }
+
+    return 'Vælg behandling';
+  }, [selectedTreatment?.duration, fallbackTreatmentDuration]);
+
+  const selectedBarber: SalonBarber | null = useMemo(() => {
+    if (!selectedBarberId) {
+      return null;
+    }
+
+    return barbers.find(barber => barber.id === selectedBarberId) ?? null;
+  }, [barbers, selectedBarberId]);
 
   const visibleDates = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(today, rangeOffset + index)),
     [today, rangeOffset]
   );
 
-  const selectedDate = useMemo(() => {
-    const [year, month, day] = selectedDateKey.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  }, [selectedDateKey]);
+  const selectionReady = Boolean(selectedTreatment && selectedBarber && salonId);
+  const activeCacheKey = selectionReady && selectedBarber && selectedTreatment
+    ? buildAvailabilityCacheKey(selectedBarber.id, selectedTreatment.id, selectedDateKey)
+    : null;
+  const currentSlots = activeCacheKey ? availabilityCache[activeCacheKey] ?? [] : [];
+  const isAvailabilityLoading = activeCacheKey ? availabilityLoadingKey === activeCacheKey : false;
 
-  const hasAnyTimes = (dateKey: string) =>
-    assistants.some(assistant => (assistant.availability[dateKey] ?? []).length > 0);
+  const fetchAvailabilityForDate = useCallback(
+    async (dateKey: string, options: { force?: boolean } = {}) => {
+      if (!salonId || !selectedBarber || !selectedTreatment) {
+        return [];
+      }
 
-  const firstAvailableDate = useMemo(
-    () =>
-      Array.from({ length: 21 }, (_, index) => addDays(today, index)).find(date =>
-        hasAnyTimes(toKey(date))
-      ) ?? today,
-    [assistants, today]
+      const cacheKey = buildAvailabilityCacheKey(selectedBarber.id, selectedTreatment.id, dateKey);
+
+      if (!options.force && availabilityCacheRef.current[cacheKey]) {
+        return availabilityCacheRef.current[cacheKey];
+      }
+
+      setAvailabilityLoadingKey(cacheKey);
+      setAvailabilityError(null);
+
+      try {
+        const slots = await loadSalonAvailability({
+          salonId,
+          barberId: selectedBarber.id,
+          serviceId: selectedTreatment.id,
+          date: dateKey,
+        });
+
+        setAvailabilityCache(prev => {
+          const next = { ...prev, [cacheKey]: slots };
+          availabilityCacheRef.current = next;
+          return next;
+        });
+
+        return slots;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Kunne ikke hente ledige tider.';
+        setAvailabilityError(message);
+        throw error;
+      } finally {
+        setAvailabilityLoadingKey(current => (current === cacheKey ? null : current));
+      }
+    },
+    [salonId, selectedBarber, selectedTreatment]
   );
 
-  const availableAssistants = useMemo(
-    () => assistants.filter(assistant => (assistant.availability[selectedDateKey] ?? []).length > 0),
-    [assistants, selectedDateKey]
-  );
+  useEffect(() => {
+    if (!selectionReady) {
+      return;
+    }
 
-  const totalSlots = useMemo(
-    () => assistants.reduce((sum, assistant) => sum + (assistant.availability[selectedDateKey] ?? []).length, 0),
-    [assistants, selectedDateKey]
-  );
-
-  const availabilityMessage = totalSlots > 0
-    ? `${availableAssistants.length} frisører har tilsammen ${totalSlots} ledige tider.`
-    : 'Ingen ledige tider denne dag. Prøv en anden dag eller tryk på første ledige tid.';
-  const canGoBack = rangeOffset > 0;
-  const selectedDateLabel = formatSelectedDate(selectedDate);
-  const selectedBookingLabel = selectedSlot
-    ? `${selectedDateLabel} kl. ${selectedSlot.time}`
-    : 'Vælg en tid for at fortsætte';
-
-  const openLogin = () => {
-    router.push({
-      pathname: '/login',
-      params: {
-        returnTo: '/book-time',
-      },
+    fetchAvailabilityForDate(selectedDateKey).catch(() => {
+      // Error state handled separately.
     });
-  };
-
-  const jumpToDate = (date: Date) => {
-    setSelectedDateKey(toKey(date));
-    setRangeOffset(Math.floor(dayDiff(today, date) / 7) * 7);
-  };
+  }, [selectionReady, selectedDateKey, fetchAvailabilityForDate]);
 
   useEffect(() => {
     if (!selectedSlot) {
       return;
     }
 
-    const assistant = assistants.find(entry => entry.id === selectedSlot.assistantId);
-    const timeSlots = assistant?.availability[selectedDateKey] ?? [];
+    if (!selectedBarber || selectedSlot.barberId !== selectedBarber.id) {
+      setSelectedSlot(null);
+      return;
+    }
 
-    if (!timeSlots.includes(selectedSlot.time)) {
+    const stillExists = currentSlots.some(slot => slot.start === selectedSlot.slot.start);
+
+    if (!stillExists) {
       setSelectedSlot(null);
     }
-  }, [assistants, selectedDateKey, selectedSlot]);
+  }, [selectedSlot, selectedBarber, currentSlots]);
+
+  const canGoBack = rangeOffset > 0;
+  const selectedDateLabel = formatSelectedDate(selectedDate);
+  const availabilityMessage = selectionReady
+    ? (isAvailabilityLoading
+      ? 'Henter ledige tider...'
+      : currentSlots.length > 0
+        ? `${currentSlots.length} ledige tider`
+        : 'Ingen ledige tider denne dag.')
+    : 'Vælg behandling og frisør for at se tider.';
+  const selectedBookingLabel = selectedSlot
+    ? `${selectedDateLabel} kl. ${formatTimeFromIso(selectedSlot.slot.start)}`
+    : 'Vælg en tid for at fortsætte';
+  const selectionMeta = selectedSlot
+    ? `${selectedSlot.barberName} · ${selectedTreatment?.name ?? fallbackTreatmentName}`
+    : selectedTreatment
+      ? `${selectedTreatment.duration} · ${selectedTreatment.price}`
+      : `${fallbackTreatmentDuration} ${fallbackTreatmentPrice}`.trim();
+  const disableFirstAvailable = !selectionReady || isSearchingFirstAvailable;
+
+  const jumpToDate = useCallback((date: Date) => {
+    setSelectedDateKey(toKey(date));
+    setRangeOffset(Math.floor(dayDiff(today, date) / 7) * 7);
+  }, [today]);
+
+  const handleFindFirstAvailable = useCallback(async () => {
+    if (disableFirstAvailable) {
+      return;
+    }
+
+    setIsSearchingFirstAvailable(true);
+
+    try {
+      let found = false;
+
+      for (let offset = 0; offset < MAX_LOOKAHEAD_DAYS; offset += 1) {
+        const candidateDate = addDays(today, offset);
+        const dateKey = toKey(candidateDate);
+        const slots = await fetchAvailabilityForDate(dateKey, { force: true });
+
+        if (slots.length > 0) {
+          found = true;
+          jumpToDate(candidateDate);
+          break;
+        }
+      }
+
+      if (!found) {
+        Alert.alert('Ingen ledige tider', 'Ingen tider fundet de næste 21 dage.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kunne ikke finde ledige tider.';
+      Alert.alert('Fejl', message);
+    } finally {
+      setIsSearchingFirstAvailable(false);
+    }
+  }, [disableFirstAvailable, today, fetchAvailabilityForDate, jumpToDate]);
+
+  const handleBook = useCallback(async () => {
+    if (!selectionReady || !selectedSlot || !selectedBarber || !selectedTreatment) {
+      return;
+    }
+
+    setIsBooking(true);
+
+    try {
+      const refreshedSlots = await fetchAvailabilityForDate(selectedDateKey, { force: true });
+      const stillAvailable = refreshedSlots.some(slot => slot.start === selectedSlot.slot.start);
+
+      if (!stillAvailable) {
+        setSelectedSlot(null);
+        Alert.alert('Tiden er væk', 'Tiden er allerede booket. Vælg en ny tid.');
+        return;
+      }
+
+      const booking = await createSalonBooking({
+        salonId,
+        payload: {
+          barberId: selectedBarber.id,
+          serviceId: selectedTreatment.id,
+          start: selectedSlot.slot.start,
+        },
+      });
+
+      try {
+        await fetchAvailabilityForDate(selectedDateKey, { force: true });
+      } catch {
+        // Ignore refresh errors after booking success.
+      }
+
+      setSelectedSlot(null);
+
+      Alert.alert(
+        'Booking bekræftet',
+        `${booking.serviceName} med ${booking.barberName} ${formatSlotLong(booking.start)}.`,
+        [
+          {
+            text: 'Se bookinger',
+            onPress: () => router.push('/bookings'),
+          },
+          {
+            text: 'OK',
+            style: 'cancel',
+          },
+        ]
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kunne ikke booke tiden.';
+      Alert.alert('Kunne ikke booke', message);
+    } finally {
+      setIsBooking(false);
+    }
+  }, [selectionReady, selectedSlot, selectedBarber, selectedTreatment, salonId, fetchAvailabilityForDate, selectedDateKey, router]);
+
+  if (!salonId) {
+    return (
+      <View style={styles.centeredState}>
+        <Text style={styles.stateTitle}>Ingen salon valgt</Text>
+        <Text style={styles.stateText}>Gå tilbage og vælg en salon for at booke en tid.</Text>
+      </View>
+    );
+  }
+
+  if (isSalonLoading || isBarbersLoading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator size="small" color="#17171d" />
+        <Text style={styles.stateTitle}>Henter bookingdata...</Text>
+      </View>
+    );
+  }
+
+  if (salonError || barbersError || !salon) {
+    return (
+      <View style={styles.centeredState}>
+        <Text style={styles.stateTitle}>Kunne ikke hente data</Text>
+        <Text style={styles.stateText}>{salonError ?? barbersError ?? 'Ukendt fejl.'}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -191,11 +411,83 @@ export default function BookTimeScreen() {
               <Ionicons name="arrow-back" size={20} color="#2d2930" />
             </TouchableOpacity>
 
-            <Text style={styles.headerTitle}>{treatmentName}</Text>
+            <Text style={styles.headerTitle}>{salon.name}</Text>
           </View>
 
-          <Text style={styles.headerMeta}>{treatmentPrice} · {treatmentDuration}</Text>
+          <Text style={styles.headerMeta}>
+            {headerPrice} · {headerDuration}
+          </Text>
+        </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Vælg behandling</Text>
+
+          <View style={styles.treatmentList}>
+            {salon.treatments.map(treatment => {
+              const isSelected = treatment.id === selectedTreatment?.id;
+
+              return (
+                <TouchableOpacity
+                  key={treatment.id}
+                  style={[styles.treatmentCard, isSelected && styles.treatmentCardSelected]}
+                  onPress={() => setSelectedTreatmentId(treatment.id)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.treatmentName}>{treatment.name}</Text>
+                  <Text style={styles.treatmentMeta}>{treatment.duration} · {treatment.price}</Text>
+                  <View style={[styles.chooseButton, isSelected && styles.chooseButtonActive]}>
+                    <Text style={[styles.chooseButtonText, isSelected && styles.chooseButtonTextActive]}>
+                      {isSelected ? 'Valgt' : 'Vælg'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Vælg frisør</Text>
+
+          {barbers.length === 0 ? (
+            <View style={styles.unavailableCard}>
+              <Text style={styles.unavailableText}>Ingen frisører tilgængelige</Text>
+              <Text style={styles.unavailableSubtext}>Prøv igen senere.</Text>
+            </View>
+          ) : (
+            <View style={styles.barberList}>
+              {barbers.map(barber => {
+                const isSelected = barber.id === selectedBarberId;
+
+                return (
+                  <TouchableOpacity
+                    key={barber.id}
+                    style={[styles.barberCard, isSelected && styles.barberCardSelected]}
+                    onPress={() => setSelectedBarberId(barber.id)}
+                    activeOpacity={0.85}
+                  >
+                    {barber.avatarUrl ? (
+                      <Image source={{ uri: barber.avatarUrl }} style={styles.barberAvatar} />
+                    ) : (
+                      <View style={styles.barberPlaceholderAvatar}>
+                        <Ionicons name="person-outline" size={18} color="#7f7984" />
+                      </View>
+                    )}
+
+                    <View style={styles.barberInfo}>
+                      <Text style={styles.barberName}>{barber.name}</Text>
+                      {barber.title ? <Text style={styles.barberTitle}>{barber.title}</Text> : null}
+                    </View>
+
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#1d1c22" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
           <View style={styles.quickRow}>
             <TouchableOpacity style={styles.quickButton} onPress={() => jumpToDate(today)} activeOpacity={0.85}>
               <Text style={styles.quickButtonText}>I dag</Text>
@@ -203,15 +495,18 @@ export default function BookTimeScreen() {
 
             <TouchableOpacity
               style={[styles.quickButton, styles.quickButtonWide]}
-              onPress={() => jumpToDate(firstAvailableDate)}
-              activeOpacity={0.85}
+              onPress={handleFindFirstAvailable}
+              activeOpacity={disableFirstAvailable ? 1 : 0.85}
+              disabled={disableFirstAvailable}
             >
-              <Text style={styles.quickButtonText}>Første ledige tid</Text>
+              <Text style={styles.quickButtonText}>
+                {isSearchingFirstAvailable ? 'Søger...' : 'Første ledige tid'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.quickIconButton, styles.quickIconButtonMuted]}
-              onPress={() => canGoBack && setRangeOffset(current => current - 7)}
+              onPress={() => setRangeOffset(current => Math.max(0, current - 7))}
               activeOpacity={canGoBack ? 0.85 : 1}
               disabled={!canGoBack}
             >
@@ -233,8 +528,8 @@ export default function BookTimeScreen() {
             </Text>
 
             <View style={styles.availabilityInline}>
-              <Text style={[styles.availabilityInlineTitle, totalSlots === 0 && styles.availabilityInlineTitleMuted]}>
-                {totalSlots > 0 ? 'Ledige tider' : 'Ingen ledige tider'}
+              <Text style={[styles.availabilityInlineTitle, currentSlots.length === 0 && styles.availabilityInlineTitleMuted]}>
+                {currentSlots.length > 0 ? 'Ledige tider' : 'Ingen ledige tider'}
               </Text>
               <Text style={styles.availabilityInlineText}>{availabilityMessage}</Text>
             </View>
@@ -245,7 +540,12 @@ export default function BookTimeScreen() {
           {visibleDates.map(date => {
             const dateKey = toKey(date);
             const isSelected = selectedDateKey === dateKey;
-            const isDisabled = !hasAnyTimes(dateKey);
+            const dateCacheKey = selectionReady && selectedBarber && selectedTreatment
+              ? buildAvailabilityCacheKey(selectedBarber.id, selectedTreatment.id, dateKey)
+              : null;
+            const isLoadingDay = dateCacheKey ? availabilityLoadingKey === dateCacheKey : false;
+            const cachedSlots = dateCacheKey ? availabilityCache[dateCacheKey] : undefined;
+            const isDisabled = Boolean(cachedSlots && cachedSlots.length === 0 && !isLoadingDay);
 
             return (
               <TouchableOpacity
@@ -282,59 +582,63 @@ export default function BookTimeScreen() {
           })}
         </View>
 
-        <View style={styles.assistantList}>
-          {assistants.map(assistant => {
-            const timeSlots = assistant.availability[selectedDateKey] ?? [];
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ledige tider</Text>
 
-            return (
-              <View key={assistant.id} style={styles.assistantSection}>
-                <View style={styles.assistantHeader}>
-                  <Image source={{ uri: assistant.avatar }} style={styles.assistantAvatar} />
+          {!selectionReady && (
+            <View style={styles.unavailableCard}>
+              <Text style={styles.unavailableText}>Vælg behandling og frisør</Text>
+              <Text style={styles.unavailableSubtext}>Derefter kan du se ledige tider.</Text>
+            </View>
+          )}
 
-                  <View style={styles.assistantInfo}>
-                    <Text style={styles.assistantName}>{assistant.name}</Text>
-                    <Text style={styles.assistantMeta}>{treatmentPrice} ({treatmentDuration})</Text>
-                    <Text style={styles.assistantStatus}>
-                      {timeSlots.length > 0 ? `${timeSlots.length} ledige tider` : 'Ingen ledige tider i dag'}
+          {selectionReady && isAvailabilityLoading && (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="small" color="#18171d" />
+              <Text style={styles.loadingText}>Henter ledige tider...</Text>
+            </View>
+          )}
+
+          {selectionReady && !isAvailabilityLoading && currentSlots.length === 0 && !availabilityError && (
+            <View style={styles.unavailableCard}>
+              <Text style={styles.unavailableText}>Ingen ledige tider</Text>
+              <Text style={styles.unavailableSubtext}>Prøv en anden dato eller søg efter første ledige tid.</Text>
+            </View>
+          )}
+
+          {availabilityError && (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>{availabilityError}</Text>
+            </View>
+          )}
+
+          {selectionReady && currentSlots.length > 0 && (
+            <View style={styles.timesGrid}>
+              {currentSlots.map(slot => {
+                const isSelected = selectedSlot?.slot.start === slot.start && selectedSlot?.barberId === selectedBarberId;
+
+                return (
+                  <TouchableOpacity
+                    key={slot.start}
+                    style={[styles.timeButton, isSelected && styles.timeButtonSelected]}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      selectedBarber &&
+                      setSelectedSlot({
+                        barberId: selectedBarber.id,
+                        barberName: selectedBarber.name,
+                        slot,
+                      })
+                    }
+                  >
+                    <Text style={[styles.timeButtonText, isSelected && styles.timeButtonTextSelected]}>
+                      {formatTimeFromIso(slot.start)}
                     </Text>
-                  </View>
-                </View>
-
-                {timeSlots.length > 0 ? (
-                  <View style={styles.timesGrid}>
-                    {timeSlots.map(time => {
-                      const isSelected =
-                        selectedSlot?.assistantId === assistant.id && selectedSlot.time === time;
-
-                      return (
-                        <TouchableOpacity
-                          key={`${assistant.id}-${time}`}
-                          style={[styles.timeButton, isSelected && styles.timeButtonSelected]}
-                          activeOpacity={0.85}
-                          onPress={() =>
-                            setSelectedSlot({
-                              assistantId: assistant.id,
-                              assistantName: assistant.name,
-                              time,
-                            })
-                          }
-                        >
-                          <Text style={[styles.timeButtonText, isSelected && styles.timeButtonTextSelected]}>
-                            {time}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <View style={styles.unavailableCard}>
-                    <Text style={styles.unavailableText}>Ingen ledige tider</Text>
-                    <Text style={styles.unavailableSubtext}>Prøv en anden dato eller vælg første ledige tid.</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -342,18 +646,16 @@ export default function BookTimeScreen() {
         <View style={styles.selectionSummary}>
           <Text style={styles.selectionLabel}>Valgt tid</Text>
           <Text style={styles.selectionValue}>{selectedBookingLabel}</Text>
-          <Text style={styles.selectionMeta}>
-            {selectedSlot ? `${selectedSlot.assistantName} · ${treatmentName}` : 'Ingen tid valgt endnu'}
-          </Text>
+          <Text style={styles.selectionMeta}>{selectionMeta || 'Ingen tid valgt endnu'}</Text>
         </View>
 
         <TouchableOpacity
-          style={[styles.bookButton, !selectedSlot && styles.bookButtonDisabled]}
-          activeOpacity={selectedSlot ? 0.9 : 1}
-          disabled={!selectedSlot}
-          onPress={openLogin}
+          style={[styles.bookButton, (!selectedSlot || isBooking) && styles.bookButtonDisabled]}
+          activeOpacity={selectedSlot && !isBooking ? 0.9 : 1}
+          disabled={!selectedSlot || isBooking}
+          onPress={handleBook}
         >
-          <Text style={styles.bookButtonText}>Book nu</Text>
+          <Text style={styles.bookButtonText}>{isBooking ? 'Booker...' : 'Book nu'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -372,6 +674,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 28,
+  },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 10,
+    backgroundColor: '#ffffff',
+  },
+  stateTitle: {
+    fontSize: 18,
+    color: '#17171d',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  stateText: {
+    fontSize: 14,
+    color: '#7c7580',
+    textAlign: 'center',
   },
   topSection: {
     paddingBottom: 14,
@@ -399,6 +720,106 @@ const styles = StyleSheet.create({
     marginLeft: 34,
     fontSize: 13,
     color: '#8a8490',
+  },
+  section: {
+    marginTop: 18,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1f1c24',
+    letterSpacing: -0.3,
+    marginBottom: 10,
+  },
+  treatmentList: {
+    gap: 12,
+  },
+  treatmentCard: {
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#efebf3',
+    backgroundColor: '#ffffff',
+  },
+  treatmentCardSelected: {
+    borderColor: '#1d1c22',
+  },
+  treatmentName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f1c24',
+  },
+  treatmentMeta: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#6f6a74',
+  },
+  chooseButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e6e1eb',
+  },
+  chooseButtonActive: {
+    borderColor: '#1d1c22',
+    backgroundColor: '#1d1c22',
+  },
+  chooseButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4b4650',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  chooseButtonTextActive: {
+    color: '#ffffff',
+  },
+  barberList: {
+    gap: 12,
+  },
+  barberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#efebf3',
+    backgroundColor: '#ffffff',
+  },
+  barberCardSelected: {
+    borderColor: '#1d1c22',
+    backgroundColor: '#f5f3fa',
+  },
+  barberAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#d9dde3',
+  },
+  barberPlaceholderAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#ece8f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barberInfo: {
+    flex: 1,
+  },
+  barberName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1f1c24',
+  },
+  barberTitle: {
+    fontSize: 12,
+    color: '#7a7480',
+    marginTop: 2,
   },
   quickRow: {
     flexDirection: 'row',
@@ -467,7 +888,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 4,
-    paddingTop: 6,
+    paddingTop: 12,
     paddingBottom: 4,
   },
   dayCard: {
@@ -509,49 +930,6 @@ const styles = StyleSheet.create({
   dayTextDisabled: {
     color: '#ddd8df',
   },
-  assistantList: {
-    gap: 18,
-    paddingTop: 14,
-  },
-  assistantSection: {
-    gap: 12,
-    padding: 16,
-    borderRadius: 22,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#efebf3',
-  },
-  assistantHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  assistantAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#d9dde3',
-  },
-  assistantInfo: {
-    flex: 1,
-  },
-  assistantName: {
-    fontSize: 15,
-    color: '#222027',
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  assistantMeta: {
-    marginTop: 2,
-    fontSize: 11,
-    color: '#8b8590',
-  },
-  assistantStatus: {
-    marginTop: 1,
-    fontSize: 11,
-    color: '#6d6671',
-    fontWeight: '500',
-  },
   unavailableCard: {
     minHeight: 72,
     borderRadius: 16,
@@ -559,6 +937,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
+    marginTop: 10,
   },
   unavailableText: {
     fontSize: 15,
@@ -571,10 +950,40 @@ const styles = StyleSheet.create({
     color: '#b0aab2',
     textAlign: 'center',
   },
+  loadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#efeaf3',
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#5a5560',
+    fontWeight: '600',
+  },
+  errorCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: '#fdeceb',
+    borderWidth: 1,
+    borderColor: '#f8c8c3',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#a83232',
+    textAlign: 'center',
+  },
   timesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 14,
   },
   timeButton: {
     width: '22.8%',
