@@ -8,6 +8,7 @@ const FAKE_USERS = [
     email: "customer@example.com",
     password: "customer123",
     name: "John Customer",
+    phone: "12345678",
     role: "customer" as UserRole,
   },
   {
@@ -15,6 +16,7 @@ const FAKE_USERS = [
     email: "admin@example.com",
     password: "admin123",
     name: "Jane Admin",
+    phone: "87654321",
     role: "admin" as UserRole,
   },
 ];
@@ -23,6 +25,7 @@ interface User {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: UserRole;
 }
 

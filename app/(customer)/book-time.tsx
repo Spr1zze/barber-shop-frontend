@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useAuth } from '@/app/contexts/AuthContext';
 import type { SalonAvailabilitySlot, SalonBarber, SalonTreatment } from '@/features/salons';
 import { useSalonBarbers, useSalonDetails } from '@/features/salons';
 import { createSalonBooking } from '@/features/salons/api/createSalonBooking';
@@ -81,6 +82,7 @@ function formatSlotLong(iso: string) {
 export default function BookTimeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<BookTimeSearchParams>();
+  const { user } = useAuth();
 
   const salonId = readParam(params.salonId);
   const initialTreatmentId = readParam(params.treatmentId);
@@ -320,6 +322,11 @@ export default function BookTimeScreen() {
       return;
     }
 
+    if (!user?.name || !user.phone) {
+      Alert.alert('Manglende kundeoplysninger', 'Du mangler navn eller telefonnummer for at kunne booke.');
+      return;
+    }
+
     setIsBooking(true);
 
     try {
@@ -338,6 +345,8 @@ export default function BookTimeScreen() {
           barberId: selectedBarber.id,
           serviceId: selectedTreatment.id,
           start: selectedSlot.slot.start,
+          customerName: user.name,
+          phone: user.phone,
         },
       });
 
@@ -369,7 +378,7 @@ export default function BookTimeScreen() {
     } finally {
       setIsBooking(false);
     }
-  }, [selectionReady, selectedSlot, selectedBarber, selectedTreatment, salonId, fetchAvailabilityForDate, selectedDateKey, router]);
+  }, [selectionReady, selectedSlot, selectedBarber, selectedTreatment, salonId, fetchAvailabilityForDate, selectedDateKey, router, user]);
 
   if (!salonId) {
     return (

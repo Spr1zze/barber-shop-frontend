@@ -37,6 +37,14 @@ export interface SalonData {
   treatments: SalonTreatment[];
 }
 
+export interface SalonListItem {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  heroImageUrl?: string;
+}
+
 export interface SalonAvailabilitySlot {
   start: string;
   end: string;
@@ -47,6 +55,8 @@ export interface SalonBookingPayload {
   serviceId: string;
   barberId: string;
   start: string; // RFC3339 timestamp in Europe/Copenhagen
+  customerName: string;
+  phone: string;
 }
 
 export interface SalonBookingResponse {

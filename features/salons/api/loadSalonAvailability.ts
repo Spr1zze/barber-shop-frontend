@@ -9,6 +9,37 @@ export interface LoadSalonAvailabilityParams {
   date: string; // YYYY-MM-DD in salon's timezone
 }
 
+function isSalonAvailabilitySlotArray(payload: unknown): payload is SalonAvailabilitySlot[] {
+  return Array.isArray(payload);
+}
+
+function normalizeAvailabilityPayload(payload: unknown): SalonAvailabilitySlot[] {
+  if (isSalonAvailabilitySlotArray(payload)) {
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    const root = payload as Record<string, unknown>;
+    const candidates = [root.slots, root.data, root.items, root.results];
+
+    for (const candidate of candidates) {
+      if (isSalonAvailabilitySlotArray(candidate)) {
+        return candidate;
+      }
+
+      if (candidate && typeof candidate === 'object') {
+        const nested = candidate as Record<string, unknown>;
+
+        if (isSalonAvailabilitySlotArray(nested.slots)) {
+          return nested.slots;
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
 export async function loadSalonAvailability({
   salonId,
   barberId,
@@ -59,7 +90,19 @@ export async function loadSalonAvailability({
     );
   }
 
-  const slots = (await response.json()) as SalonAvailabilitySlot[];
+  const payload = await response.json();
+  const slots = normalizeAvailabilityPayload(payload);
+
+  if (!slots.length && !isSalonAvailabilitySlotArray(payload)) {
+    console.warn('[salons] loadSalonAvailability unexpected payload shape', {
+      salonId,
+      barberId,
+      serviceId,
+      date,
+      url,
+      payload,
+    });
+  }
 
   console.log('[salons] loadSalonAvailability success', {
     salonId,
