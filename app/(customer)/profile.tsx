@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function ProfileScreen() {
@@ -31,6 +31,22 @@ function AdminProfile({ user }) {
       {/* Admin-specific content */}
       <View style={styles.adminSection}>
         <Text style={styles.sectionTitle}>Admin Controls</Text>
+        <Pressable
+          onPress={() => {
+            console.log("Adding new barber..."); // Debug log
+          }}
+          style={styles.menuButton}
+        >
+          <Text style={styles.buttonText}>Tilføj ny frisør</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            console.log("Removing barber..."); // Debug log
+          }}
+          style={styles.menuButton}
+        >
+          <Text style={styles.buttonText}>Fjern frisør</Text>
+        </Pressable>
         {/* Admin features here */}
       </View>
     </View>
@@ -41,6 +57,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  menuButton: {
+    backgroundColor: "#007AFF",
+    width: "25%",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  buttonText: {
+    fontSize: 12,
+    fontWeight: "bold",
   },
   title: {
     fontSize: 24,

@@ -21,10 +21,11 @@ export default function TopBar() {
     <View style={styles.topbar}>
       <Image source={Logo} style={styles.logo} />
 
-      <View style={styles.userInfo}>
+      {/* This is for user info in middle of header. Purely for visualization if needed. */}
+      {/* <View style={styles.userInfo}>
         <Text style={styles.userName}>{user?.name}</Text>
         <Text style={styles.userRole}>({user?.role})</Text>
-      </View>
+      </View> */}
 
       <Pressable
         onPress={() => {
