@@ -79,39 +79,19 @@ function mapSalonResponse(salon: BackendSalonData): SalonData {
 export async function loadSalonById(salonId: string): Promise<SalonData> {
   const url = `${API_BASE_URL}/salons/${salonId}`;
 
-  console.log('[salons] loadSalonById request', { salonId, url });
-
   let response: Response;
 
   try {
     response = await fetch(url);
   } catch (error) {
-    console.error('[salons] loadSalonById network error', {
-      salonId,
-      url,
-      error,
-    });
     throw new Error(`Network request failed for ${url}`);
   }
-
-  console.log('[salons] loadSalonById response', {
-    salonId,
-    url,
-    status: response.status,
-    ok: response.ok,
-  });
 
   if (!response.ok) {
     throw new Error(`Failed to load salon "${salonId}" from ${url} (${response.status}).`);
   }
 
   const salon = (await response.json()) as BackendSalonData;
-
-  console.log('[salons] loadSalonById success', {
-    salonId,
-    url,
-    name: salon.name,
-  });
 
   return mapSalonResponse(salon);
 }

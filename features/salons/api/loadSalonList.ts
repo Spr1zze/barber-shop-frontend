@@ -76,34 +76,18 @@ function normalizeSalonListPayload(payload: unknown): SalonListItem[] {
 export async function loadSalonList(): Promise<SalonListItem[]> {
   const url = `${API_BASE_URL}/salon/details`;
 
-  console.log('[salons] loadSalonList request', { url });
-
   let response: Response;
 
   try {
     response = await fetch(url);
   } catch (error) {
-    console.error('[salons] loadSalonList network error', { url, error });
     throw new ApiError(`Network request failed for ${url}`, undefined, error);
   }
-
-  console.log('[salons] loadSalonList response', {
-    url,
-    status: response.status,
-    ok: response.ok,
-  });
 
   if (!response.ok) {
     throw new Error(`Failed to load salons from ${url} (${response.status}).`);
   }
 
   const payload = await response.json();
-  const salons = normalizeSalonListPayload(payload);
-
-  console.log('[salons] loadSalonList success', {
-    url,
-    count: salons.length,
-  });
-
-  return salons;
+  return normalizeSalonListPayload(payload);
 }

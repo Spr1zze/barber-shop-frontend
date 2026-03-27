@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+
 import { useAuth } from "../app/contexts/AuthContext";
 import Logo from "../assets/images/icon.png";
 
@@ -11,7 +12,6 @@ export default function TopBar() {
   const router = useRouter();
 
   const handleLogout = () => {
-    console.log("Logout clicked!"); // Debug log
     setMenuVisible(false);
     logout();
     router.replace("/login");
@@ -21,37 +21,26 @@ export default function TopBar() {
     <View style={styles.topbar}>
       <Image source={Logo} style={styles.logo} />
 
-      {/* This is for user info in middle of header. Purely for visualization if needed. */}
-      {/* <View style={styles.userInfo}>
+      <View style={styles.userInfo}>
         <Text style={styles.userName}>{user?.name}</Text>
         <Text style={styles.userRole}>({user?.role})</Text>
-      </View> */}
+      </View>
 
-      <Pressable
-        onPress={() => {
-          console.log("Menu toggled!"); // Debug log
-          setMenuVisible(!menuVisible);
-        }}
-        style={styles.menuButton}
-      >
+      <Pressable onPress={() => setMenuVisible(!menuVisible)} style={styles.menuButton}>
         <Ionicons name="menu-outline" size={28} color="#5a5561" />
       </Pressable>
 
-      {/* Option 1: Using Modal (more reliable) */}
       <Modal
         visible={menuVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setMenuVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setMenuVisible(false)}
-        >
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.dropdown}>
             <Pressable onPress={handleLogout} style={styles.menuItem}>
               <Ionicons name="log-out-outline" size={20} color="#5a5561" />
-              <Text style={styles.menuText}>Logout</Text>
+              <Text style={styles.menuText}>Log ud</Text>
             </Pressable>
           </View>
         </Pressable>

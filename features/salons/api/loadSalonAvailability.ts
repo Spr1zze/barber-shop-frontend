@@ -49,39 +49,13 @@ export async function loadSalonAvailability({
   const query = `barberId=${encodeURIComponent(barberId)}&serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(date)}`;
   const url = `${API_BASE_URL}/salons/${salonId}/availability?${query}`;
 
-  console.log('[salons] loadSalonAvailability request', {
-    salonId,
-    barberId,
-    serviceId,
-    date,
-    url,
-  });
-
   let response: Response;
 
   try {
     response = await fetch(url);
   } catch (error) {
-    console.error('[salons] loadSalonAvailability network error', {
-      salonId,
-      barberId,
-      serviceId,
-      date,
-      url,
-      error,
-    });
     throw new ApiError(`Network request failed for ${url}`, undefined, error);
   }
-
-  console.log('[salons] loadSalonAvailability response', {
-    salonId,
-    barberId,
-    serviceId,
-    date,
-    url,
-    status: response.status,
-    ok: response.ok,
-  });
 
   if (!response.ok) {
     throw await createApiError(
@@ -91,26 +65,5 @@ export async function loadSalonAvailability({
   }
 
   const payload = await response.json();
-  const slots = normalizeAvailabilityPayload(payload);
-
-  if (!slots.length && !isSalonAvailabilitySlotArray(payload)) {
-    console.warn('[salons] loadSalonAvailability unexpected payload shape', {
-      salonId,
-      barberId,
-      serviceId,
-      date,
-      url,
-      payload,
-    });
-  }
-
-  console.log('[salons] loadSalonAvailability success', {
-    salonId,
-    barberId,
-    serviceId,
-    date,
-    slotCount: slots.length,
-  });
-
-  return slots;
+  return normalizeAvailabilityPayload(payload);
 }

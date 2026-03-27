@@ -1,8 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+
 import { useAuth } from "../contexts/AuthContext";
 
+type ProfileProps = {
+  user: {
+    name: string;
+    email: string;
+  } | null;
+};
+
 export default function ProfileScreen() {
-  const { user, isAdmin, isCustomer } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   if (isAdmin) {
     return <AdminProfile user={user} />;
@@ -11,43 +19,28 @@ export default function ProfileScreen() {
   return <CustomerProfile user={user} />;
 }
 
-function CustomerProfile({ user }) {
+function CustomerProfile({ user }: ProfileProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Customer Profile</Text>
-      <Text style={styles.info}>Name: {user?.name}</Text>
-      <Text style={styles.info}>Email: {user?.email}</Text>
-      {/* Customer-specific content */}
+      <Text style={styles.title}>Kundeprofil</Text>
+      <Text style={styles.info}>Navn: {user?.name}</Text>
+      <Text style={styles.info}>E-mail: {user?.email}</Text>
     </View>
   );
 }
 
-function AdminProfile({ user }) {
+function AdminProfile({ user }: ProfileProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Admin Dashboard</Text>
-      <Text style={styles.info}>Name: {user?.name}</Text>
-      <Text style={styles.info}>Email: {user?.email}</Text>
-      {/* Admin-specific content */}
+      <Text style={styles.title}>Adminprofil</Text>
+      <Text style={styles.info}>Navn: {user?.name}</Text>
+      <Text style={styles.info}>E-mail: {user?.email}</Text>
+
       <View style={styles.adminSection}>
-        <Text style={styles.sectionTitle}>Admin Controls</Text>
-        <Pressable
-          onPress={() => {
-            console.log("Adding new barber..."); // Debug log
-          }}
-          style={styles.menuButton}
-        >
-          <Text style={styles.buttonText}>Tilføj ny frisør</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            console.log("Removing barber..."); // Debug log
-          }}
-          style={styles.menuButton}
-        >
-          <Text style={styles.buttonText}>Fjern frisør</Text>
-        </Pressable>
-        {/* Admin features here */}
+        <Text style={styles.sectionTitle}>Admin</Text>
+        <Text style={styles.helperText}>
+          Adminværktøjer er ikke en del af demoen endnu.
+        </Text>
       </View>
     </View>
   );
@@ -57,17 +50,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-  },
-  menuButton: {
-    backgroundColor: "#007AFF",
-    width: "25%",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  buttonText: {
-    fontSize: 12,
-    fontWeight: "bold",
   },
   title: {
     fontSize: 24,
@@ -88,5 +70,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
+  },
+  helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#555",
   },
 });

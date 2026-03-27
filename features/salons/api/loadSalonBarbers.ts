@@ -51,44 +51,18 @@ function normalizeBarbersPayload(payload: unknown): SalonBarber[] {
 export async function loadSalonBarbers(salonId: string): Promise<SalonBarber[]> {
   const url = `${API_BASE_URL}/salons/${salonId}/barbers`;
 
-  console.log('[salons] loadSalonBarbers request', { salonId, url });
-
   let response: Response;
 
   try {
     response = await fetch(url);
   } catch (error) {
-    console.error('[salons] loadSalonBarbers network error', { salonId, url, error });
     throw new ApiError(`Network request failed for ${url}`, undefined, error);
   }
-
-  console.log('[salons] loadSalonBarbers response', {
-    salonId,
-    url,
-    status: response.status,
-    ok: response.ok,
-  });
 
   if (!response.ok) {
     throw await createApiError(response, `Failed to load barbers for "${salonId}" from ${url}.`);
   }
 
   const payload = await response.json();
-  const barbers = normalizeBarbersPayload(payload);
-
-  if (!barbers.length && !isSalonBarberArray(payload)) {
-    console.warn('[salons] loadSalonBarbers unexpected payload shape', {
-      salonId,
-      url,
-      payload,
-    });
-  }
-
-  console.log('[salons] loadSalonBarbers success', {
-    salonId,
-    url,
-    count: barbers.length,
-  });
-
-  return barbers;
+  return normalizeBarbersPayload(payload);
 }

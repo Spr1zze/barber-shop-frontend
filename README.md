@@ -1,51 +1,58 @@
-# Welcome to your Expo app 👋
+# Barber Shop Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
-emulator -avd Pixel_9_API_35_2
-## Get started
+Expo Router frontend for a barber booking project. The app lets a customer browse salons, view salon details, pick a treatment and barber, and create a booking from available time slots.
 
-1. Install dependencies
+## Main Features
+
+- Browse salons from the backend API
+- Search salons by name or address
+- View salon details, treatments, contact info, and opening hours
+- Pick barber, date, and available time for a booking
+- Review upcoming and past bookings
+- Basic auth flow with demo users for development and presentation
+
+## Tech Stack
+
+- Expo
+- React Native
+- Expo Router
+- TypeScript
+
+## Running The Project
+
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Start the Expo dev server:
 
    ```bash
-   npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+3. If needed, point the app at the backend API:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   EXPO_PUBLIC_API_BASE_URL=http://YOUR_IP:8000
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+If `EXPO_PUBLIC_API_BASE_URL` is not set, the app falls back to the Expo host IP, Android emulator host, or `localhost` depending on the environment.
 
-## Get a fresh project
+## Demo Login
 
-When you're ready, run:
+- Customer: `customer@example.com` / `customer123`
+- Admin: `admin@example.com` / `admin123`
 
-```bash
-npm run reset-project
-```
+## Project Structure
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- `app/`: route files and app-level providers
+- `components/`: reusable UI components
+- `features/salons/`: salon API, hooks, cache, and types
+- `features/history/`: booking history API and data types
 
-## Learn more
+## Notes
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-# barber-shop-frontend
+- Authentication is currently demo-based and intended for development and presentation.
+- The frontend expects a backend API running on port `8000`.
